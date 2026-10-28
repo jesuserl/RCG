@@ -1,25 +1,23 @@
 import React from 'react';
-import { PortalMode } from '../types';
+import { PortalMode, EmployeeProfile } from '../types';
 import { 
   Briefcase, 
   ShieldCheck, 
-  Database,
-  Coins
+  Coins,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 interface TopBarProps {
   portalMode: PortalMode;
-  onChangePortalMode: (mode: PortalMode) => void;
-  onOpenSupabaseModal: () => void;
-  currentEmployeeName?: string;
+  currentEmployee?: EmployeeProfile;
+  onLogout: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   portalMode,
-  onChangePortalMode,
-  onOpenSupabaseModal,
-  currentEmployeeName,
+  currentEmployee,
+  onLogout,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 no-print">
@@ -39,65 +37,43 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Center Portal Indicator */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-xl text-xs">
+        {/* Center Portal Identity Badge */}
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-xl text-xs">
           {portalMode === 'admin' ? (
-            <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+            <div className="flex items-center gap-2 font-bold text-emerald-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Panel Administrador (Finanzas)</span>
+              <span>Sesión: Administrador de Finanzas</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 font-bold text-blue-900">
-              <Briefcase className="w-4 h-4 text-blue-600" />
-              <span>Portal del Colaborador ({currentEmployeeName})</span>
+            <div className="flex items-center gap-2 font-bold text-blue-900">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <UserCheck className="w-4 h-4 text-blue-600" />
+              <span>Colaborador: {currentEmployee?.name || 'Usuario'}</span>
+              <span className="text-[10px] text-slate-500 font-mono font-normal">
+                ({currentEmployee?.token})
+              </span>
             </div>
           )}
         </div>
 
         {/* Right Action Zone */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Moneda Fija VES Indicator */}
-          <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl font-mono-numbers">
+          <div className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl font-mono-numbers">
             <Coins className="w-3.5 h-3.5 text-blue-600" />
-            <span>Moneda: Bs.</span>
+            <span>Bs. VES</span>
           </div>
 
-          {/* Supabase Cloud Connection Status */}
+          {/* Cerrar Sesión Button */}
           <button
-            onClick={onOpenSupabaseModal}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
-              isSupabaseConfigured()
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-            title="Configuración de base de datos Supabase en Vercel"
+            onClick={onLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors cursor-pointer"
+            title="Cerrar sesión actual y volver a la pantalla de acceso con token"
           >
-            <Database className={`w-3.5 h-3.5 ${isSupabaseConfigured() ? 'text-emerald-600' : 'text-slate-500'}`} />
-            <span className="hidden sm:inline">
-              {isSupabaseConfigured() ? 'Supabase Conectado' : 'DB Supabase'}
-            </span>
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Cerrar Sesión</span>
           </button>
-
-          {/* Independent Portal Switcher Button */}
-          {portalMode === 'admin' ? (
-            <button
-              onClick={() => onChangePortalMode('employee')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200"
-              title="Cambiar al Portal de Empleado"
-            >
-              <Briefcase className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden sm:inline">Ir a Portal Empleado</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => onChangePortalMode('admin')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors border border-emerald-200"
-              title="Acceso restringido para el Administrador de Finanzas"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Acceso Administrador</span>
-            </button>
-          )}
         </div>
       </div>
     </header>

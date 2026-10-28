@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { TripRelation, Expense, EmployeeProfile } from '../types';
+import { TripRelation, Expense, EmployeeProfile, DEFAULT_ADMIN_TOKEN } from '../types';
 import { CATEGORIES_CONFIG } from '../utils/categories';
 import { CategoryBreakdown } from './CategoryBreakdown';
+import { CreateEmployeeModal } from './CreateEmployeeModal';
 import { 
   Plus, 
   ShieldCheck, 
@@ -12,43 +13,81 @@ import {
   Eye, 
   Printer, 
   Search, 
-  Download,
-  Building,
-  User,
-  MapPin,
-  Calendar,
-  Coins
+  Download, 
+  User, 
+  MapPin, 
+  Calendar, 
+  Coins,
+  KeyRound,
+  Users,
+  Copy,
+  Check,
+  RefreshCw,
+  Trash2,
+  Database,
+  ExternalLink,
+  Save,
+  Server
 } from 'lucide-react';
 import { exportExpensesToCsv } from '../utils/exportCsv';
+import { 
+  isSupabaseConfigured, 
+  getSupabaseCredentials, 
+  saveSupabaseCredentials 
+} from '../lib/supabase';
 
 interface AdminPortalProps {
   relations: TripRelation[];
   expenses: Expense[];
   employees: EmployeeProfile[];
+  adminToken: string;
   onOpenCreateRelation: () => void;
   onApproveExpense: (id: string) => void;
   onRejectExpense: (id: string, notes: string) => void;
   onSettleRelation: (relationId: string) => void;
   onViewReceipt: (expense: Expense) => void;
   onOpenPrintReport: (relation: TripRelation) => void;
+  onCreateEmployee: (newEmp: Omit<EmployeeProfile, 'id'>) => void;
+  onUpdateEmployeeToken: (employeeId: string, newToken: string) => void;
+  onDeleteEmployee: (employeeId: string) => void;
+  onUpdateAdminToken: (newToken: string) => void;
+  onSyncSupabase?: () => void;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
   relations,
   expenses,
   employees,
+  adminToken,
   onOpenCreateRelation,
   onApproveExpense,
   onRejectExpense,
   onSettleRelation,
   onViewReceipt,
   onOpenPrintReport,
+  onCreateEmployee,
+  onUpdateEmployeeToken,
+  onDeleteEmployee,
+  onUpdateAdminToken,
+  onSyncSupabase,
 }) => {
+  const [activeTab, setActiveTab] = useState<'relations' | 'audit' | 'analytics' | 'collaborators' | 'database'>('relations');
   const [selectedRelationFilter, setSelectedRelationFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'relations' | 'audit' | 'analytics'>('relations');
   const [searchQuery, setSearchQuery] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState('');
+
+  // Collaborator management state
+  const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false);
+  const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
+  const [adminTokenEditing, setAdminTokenEditing] = useState(false);
+  const [newAdminTokenInput, setNewAdminTokenInput] = useState(adminToken || DEFAULT_ADMIN_TOKEN);
+
+  // Supabase settings state
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => getSupabaseCredentials().url);
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => getSupabaseCredentials().anonKey);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [savedDbAlert, setSavedDbAlert] = useState(false);
 
   // Global totals in Bolívares
   const totalAllocated = relations.reduce((sum, r) => sum + r.allocatedBudget, 0);
@@ -87,6 +126,98 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     exportExpensesToCsv(expenses, undefined, 'auditoria_general_viaticos_ves');
   };
 
+  const handleCopyToken = (id: string, token: string) => {
+    navigator.clipboard.writeText(token);
+    setCopiedTokenId(id);
+    setTimeout(() => setCopiedTokenId(null), 2500);
+  };
+
+  const handleRegenerateToken = (employeeId: string, currentName: string) => {
+    const newToken = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
+    if (window.confirm(`¿Deseas generar un nuevo token de acceso para ${currentName}? El nuevo token será: ${newToken}`)) {
+      onUpdateEmployeeToken(employeeId, newToken);
+    }
+  };
+
+  const handleSaveAdminToken = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminTokenInput.trim()) {
+      alert('El token de administrador no puede estar vacío');
+      return;
+    }
+    onUpdateAdminToken(newAdminTokenInput.trim());
+    setAdminTokenEditing(false);
+    alert('Token de Administrador actualizado con éxito.');
+  };
+
+  const handleSaveSupabaseConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveSupabaseCredentials(supabaseUrlInput, supabaseKeyInput);
+    setSavedDbAlert(true);
+    setTimeout(() => {
+      setSavedDbAlert(false);
+      window.location.reload();
+    }, 1500);
+  };
+
+  const sqlSample = `-- ==============================================================================
+-- VIÁTICOSPRO - ESQUEMA DE BASE DE DATOS POSTGRESQL PARA SUPABASE (SOLO VES)
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.employees (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    department TEXT NOT NULL,
+    position TEXT NOT NULL,
+    access_token TEXT NOT NULL DEFAULT 'EMP-1000',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.trip_relations (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    employee_name TEXT NOT NULL,
+    allocated_budget_ves NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    admin_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.expenses (
+    id TEXT PRIMARY KEY,
+    relation_id TEXT NOT NULL REFERENCES public.trip_relations(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    category TEXT NOT NULL,
+    concept TEXT NOT NULL,
+    amount NUMERIC(14, 2) NOT NULL,
+    employee_name TEXT NOT NULL,
+    project_name TEXT NOT NULL,
+    receipt_url TEXT,
+    receipt_file_name TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    finance_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trip_relations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Acceso publico empleados" ON public.employees FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso publico relaciones" ON public.trip_relations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WITH CHECK (true);`;
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(sqlSample);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
+  };
+
   return (
     <div className="space-y-6">
       {/* Admin Header with Badges & Primary Actions */}
@@ -98,22 +229,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               Panel de Administración y Finanzas (Bs. VES)
             </span>
             <span className="text-xs text-slate-400 font-mono-numbers">
-              {relations.length} Relaciones Activas
+              {relations.length} Relaciones · {employees.length} Colaboradores
             </span>
           </div>
 
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
-            Asignaciones y Liquidación de Viáticos en Bolívares
+            Asignaciones, Liquidación y Seguridad de Viáticos
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Crea fondos en Bolívares por colaborador y audita comprobantes fiscales para liquidación
+            Crea fondos en Bolívares por colaborador, asigna tokens de acceso y audita comprobantes fiscales
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={handleExportAllCsv}
-            className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+            className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
             title="Exportar archivo CSV con todos los gastos y relaciones en Bolívares"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
@@ -122,7 +253,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
           <button
             onClick={onOpenCreateRelation}
-            className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
           >
             <FolderPlus className="w-4 h-4" />
             <span>+ Cargar Relación (Bs.)</span>
@@ -183,19 +314,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       </div>
 
-      {/* Admin Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit text-xs font-bold">
+      {/* Admin Navigation Tabs */}
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-2xl text-xs font-bold w-fit">
         <button
           onClick={() => setActiveTab('relations')}
-          className={`px-4 py-2 rounded-lg transition-all ${
+          className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
             activeTab === 'relations' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Relaciones de Viáticos ({relations.length})
         </button>
+
         <button
           onClick={() => setActiveTab('audit')}
-          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'audit' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -206,13 +338,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </span>
           )}
         </button>
+
+        <button
+          onClick={() => setActiveTab('collaborators')}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'collaborators' ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 text-blue-600" />
+          <span>Colaboradores & Tokens ({employees.length})</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`px-4 py-2 rounded-lg transition-all ${
+          className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
             activeTab === 'analytics' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           Desglose por Rubros
+        </button>
+
+        <button
+          onClick={() => setActiveTab('database')}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'database' ? 'bg-white text-emerald-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Database className={`w-3.5 h-3.5 ${isSupabaseConfigured() ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <span>Base de Datos Supabase</span>
+          {isSupabaseConfigured() && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          )}
         </button>
       </div>
 
@@ -231,7 +387,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
             <button
               onClick={onOpenCreateRelation}
-              className="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xs flex items-center gap-1"
+              className="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Nueva Relación</span>
@@ -341,7 +497,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           setSelectedRelationFilter(rel.id);
                           setActiveTab('audit');
                         }}
-                        className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+                        className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors cursor-pointer"
                         title="Auditar comprobantes de esta relación"
                       >
                         Auditar Gastos
@@ -349,7 +505,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                       <button
                         onClick={() => onOpenPrintReport(rel)}
-                        className="p-1.5 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                        className="p-1.5 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
                         title="Generar planilla oficial de liquidación"
                       >
                         <Printer className="w-4 h-4" />
@@ -358,7 +514,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       {rel.status !== 'settled' && (
                         <button
                           onClick={() => onSettleRelation(rel.id)}
-                          className="px-2.5 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors"
+                          className="px-2.5 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer"
                           title="Cerrar y marcar relación como liquidada conforme"
                         >
                           Liquidar
@@ -437,7 +593,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             [{expense.projectName}]
                           </span>
 
-                          {/* Approval status badge */}
                           {expense.status === 'approved' && (
                             <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-0.5">
                               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -476,7 +631,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                     </div>
 
-                    {/* Amount in Bs. + View Receipt + Finance Buttons */}
                     <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       <div className="text-left sm:text-right">
                         <div className="text-base font-bold text-slate-900 font-mono-numbers">
@@ -487,19 +641,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       {expense.receiptUrl && (
                         <button
                           onClick={() => onViewReceipt(expense)}
-                          className="p-2 text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-xl transition-colors border border-slate-200"
+                          className="p-2 text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-xl transition-colors border border-slate-200 cursor-pointer"
                           title="Ver factura o comprobante fiscal"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                       )}
 
-                      {/* 1-Click Approve or Observe */}
                       <div className="flex items-center gap-1.5">
                         {expense.status !== 'approved' && (
                           <button
                             onClick={() => onApproveExpense(expense.id)}
-                            className="px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1"
+                            className="px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             <span>Aprobar</span>
@@ -512,7 +665,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                               setRejectingId(expense.id);
                               setRejectNotes(expense.financeNotes || '');
                             }}
-                            className="px-2.5 py-1.5 text-xs font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors flex items-center gap-1"
+                            className="px-2.5 py-1.5 text-xs font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <XCircle className="w-3.5 h-3.5 text-rose-600" />
                             <span>Observar</span>
@@ -521,7 +674,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                     </div>
 
-                    {/* Inline note box if observing */}
                     {isRejecting && (
                       <div className="w-full sm:col-span-2 pt-2 border-t border-slate-100 mt-2 bg-rose-50/70 p-3 rounded-xl border border-rose-200">
                         <label className="block text-xs font-semibold text-rose-900 mb-1">
@@ -538,13 +690,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           />
                           <button
                             onClick={() => handleConfirmReject(expense.id)}
-                            className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg"
+                            className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer"
                           >
                             Confirmar Objeción
                           </button>
                           <button
                             onClick={() => setRejectingId(null)}
-                            className="px-2.5 py-1.5 text-xs font-semibold text-slate-600"
+                            className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 cursor-pointer"
                           >
                             Cancelar
                           </button>
@@ -559,12 +711,314 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       )}
 
-      {/* TAB 3: ANALÍTICA Y DESGLOSE GLOBAL */}
+      {/* TAB 3: GESTIÓN DE COLABORADORES Y TOKENS DE ACCESO */}
+      {activeTab === 'collaborators' && (
+        <div className="space-y-6">
+          {/* Section 1: Collaborators List */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <span>Colaboradores Registrados y Tokens de Acceso</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Cada colaborador usa su token único al iniciar la aplicación para acceder únicamente a sus gastos
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsCreateEmployeeModalOpen(true)}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Registrar Colaborador</span>
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {employees.map(emp => {
+                const empRelations = relations.filter(r => r.employeeName === emp.name);
+                const empBudget = empRelations.reduce((sum, r) => sum + r.allocatedBudget, 0);
+                const isCopied = copiedTokenId === emp.id;
+
+                return (
+                  <div
+                    key={emp.id}
+                    className="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold text-sm shrink-0">
+                        {emp.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-extrabold text-slate-900">
+                            {emp.name}
+                          </h4>
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                            {emp.department}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {emp.position}
+                        </p>
+
+                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 font-mono-numbers">
+                          <span>{empRelations.length} viajes asignados</span>
+                          <span>·</span>
+                          <span>Presupuesto acumulado: Bs. {empBudget.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Token Display & Actions */}
+                    <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
+                      <div className="text-left md:text-right">
+                        <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                          Token de Acceso
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="font-mono font-bold text-xs px-2.5 py-1 bg-slate-100 text-blue-900 rounded-lg border border-slate-200">
+                            {emp.token}
+                          </span>
+                          <button
+                            onClick={() => handleCopyToken(emp.id, emp.token)}
+                            className="p-1.5 text-slate-500 hover:text-blue-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                            title="Copiar token para enviar al colaborador"
+                          >
+                            {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                        <button
+                          onClick={() => handleRegenerateToken(emp.id, emp.name)}
+                          className="p-2 text-slate-500 hover:text-amber-600 bg-slate-50 hover:bg-amber-50 rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                          title="Regenerar nuevo token de acceso para este usuario"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`¿Estás seguro de eliminar al colaborador ${emp.name}?`)) {
+                              onDeleteEmployee(emp.id);
+                            }
+                          }}
+                          className="p-2 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                          title="Eliminar colaborador"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section 2: Master Admin Token Security Card */}
+          <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-white">
+                    Token Maestro de Administrador (Finanzas)
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Este token es la llave de acceso a este panel de control y auditoría.
+                  </p>
+                </div>
+              </div>
+
+              {!adminTokenEditing ? (
+                <div className="flex items-center gap-3">
+                  <div className="px-3.5 py-1.5 bg-slate-800 rounded-xl border border-slate-700 font-mono font-bold text-sm text-emerald-400">
+                    {adminToken || DEFAULT_ADMIN_TOKEN}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewAdminTokenInput(adminToken || DEFAULT_ADMIN_TOKEN);
+                      setAdminTokenEditing(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors cursor-pointer border border-slate-700"
+                  >
+                    Cambiar Token
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSaveAdminToken} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newAdminTokenInput}
+                    onChange={e => setNewAdminTokenInput(e.target.value.toUpperCase())}
+                    className="px-3 py-1.5 text-xs font-mono font-bold bg-slate-800 border border-emerald-500 text-white rounded-xl focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl cursor-pointer"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdminTokenEditing(false)}
+                    className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancelar
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: ANALÍTICA Y DESGLOSE GLOBAL */}
       {activeTab === 'analytics' && (
         <div className="grid grid-cols-1 gap-6">
           <CategoryBreakdown expenses={expenses} />
         </div>
       )}
+
+      {/* TAB 5: BASE DE DATOS SUPABASE (EXCLUSIVO DEL ADMINISTRADOR) */}
+      {activeTab === 'database' && (
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                <Database className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                  Configuración de Base de Datos Supabase (Vercel)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Panel reservado para el Administrador para conectar la base de datos PostgreSQL en la nube
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className={`px-3 py-1 rounded-xl text-xs font-bold border flex items-center gap-1.5 ${
+                isSupabaseConfigured()
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured() ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span>{isSupabaseConfigured() ? 'Supabase Conectado' : 'Almacenamiento Local (Offline)'}</span>
+              </div>
+
+              {onSyncSupabase && (
+                <button
+                  onClick={onSyncSupabase}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Sincronizar relaciones y gastos con Supabase"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sincronizar</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Form to set credentials directly in UI */}
+          <form onSubmit={handleSaveSupabaseConfig} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 text-xs">
+            <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              <Server className="w-4 h-4 text-blue-600" />
+              <span>Credenciales de Conexión de Supabase</span>
+            </h4>
+            <p className="text-xs text-slate-500">
+              Puedes ingresar tu Proyecto de Supabase aquí directamente para sincronización en tiempo real, o configurarlo en las Variables de Entorno de Vercel.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                  Project URL (VITE_SUPABASE_URL):
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://xyzcompany.supabase.co"
+                  value={supabaseUrlInput}
+                  onChange={e => setSupabaseUrlInput(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs font-mono text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                  Anon Public Key (VITE_SUPABASE_ANON_KEY):
+                </label>
+                <input
+                  type="password"
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  value={supabaseKeyInput}
+                  onChange={e => setSupabaseKeyInput(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs font-mono text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            {savedDbAlert && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>Credenciales guardadas. Recargando conexión...</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Credenciales</span>
+              </button>
+            </div>
+          </form>
+
+          {/* SQL Script Viewer */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Script de Creación SQL para Supabase:
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Incluye la tabla de empleados con tokens, relaciones de viáticos y comprobantes en Bolívares.
+                </span>
+              </div>
+
+              <button
+                onClick={handleCopySql}
+                className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedSql ? '¡Copiado!' : 'Copiar SQL Completo'}</span>
+              </button>
+            </div>
+
+            <pre className="p-4 bg-slate-900 text-slate-200 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-72 border border-slate-800 leading-relaxed">
+              {sqlSample}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Crear Colaborador */}
+      <CreateEmployeeModal
+        isOpen={isCreateEmployeeModalOpen}
+        onClose={() => setIsCreateEmployeeModalOpen(false)}
+        onSave={onCreateEmployee}
+      />
     </div>
   );
 };

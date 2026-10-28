@@ -24,8 +24,6 @@ interface EmployeePortalProps {
   onOpenNewExpense: (relationId: string) => void;
   onViewReceipt: (expense: Expense) => void;
   onSubmitRelation: (relationId: string) => void;
-  onChangeEmployeeProfile: (employeeName: string) => void;
-  allEmployees: EmployeeProfile[];
 }
 
 export const EmployeePortal: React.FC<EmployeePortalProps> = ({
@@ -35,8 +33,6 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   onOpenNewExpense,
   onViewReceipt,
   onSubmitRelation,
-  onChangeEmployeeProfile,
-  allEmployees,
 }) => {
   // Only relations assigned to THIS employee
   const myRelations = relations.filter(r => r.employeeName === currentEmployee.name);
@@ -72,7 +68,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 {currentEmployee.name}
               </h2>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                Portal del Colaborador
+                Colaborador Autorizado
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -81,20 +77,22 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
           </div>
         </div>
 
-        {/* Quick simulator to switch between employees to test multiple assignments */}
-        <div className="flex items-center gap-2 text-xs bg-slate-50 p-2 rounded-xl border border-slate-200 shrink-0">
-          <span className="text-slate-500 font-semibold">Simular colaborador:</span>
-          <select
-            value={currentEmployee.name}
-            onChange={e => onChangeEmployeeProfile(e.target.value)}
-            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:outline-none focus:border-blue-600 text-xs"
-          >
-            {allEmployees.map(emp => (
-              <option key={emp.id} value={emp.name}>
-                {emp.name}
-              </option>
-            ))}
-          </select>
+        {/* Security & Token Info */}
+        <div className="flex items-center gap-3 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200 shrink-0">
+          <div className="text-left">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tu Token de Acceso</span>
+            <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs inline-block mt-0.5">
+              {currentEmployee.token}
+            </span>
+          </div>
+          <div className="h-7 w-px bg-slate-200" />
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1 justify-end">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Sesión Verificada
+            </span>
+            <span className="text-[11px] text-slate-500">Solo ves tus gastos</span>
+          </div>
         </div>
       </div>
 

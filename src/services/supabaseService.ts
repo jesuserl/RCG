@@ -1,5 +1,29 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { TripRelation, Expense } from '../types';
+import { TripRelation, Expense, EmployeeProfile } from '../types';
+
+/**
+ * Mapeo de EmployeeProfile a employees (PostgreSQL)
+ */
+function mapEmployeeToDb(emp: EmployeeProfile) {
+  return {
+    id: emp.id,
+    name: emp.name,
+    department: emp.department,
+    position: emp.position,
+    access_token: emp.token,
+  };
+}
+
+function mapEmployeeFromDb(row: any): EmployeeProfile {
+  return {
+    id: row.id,
+    name: row.name,
+    department: row.department,
+    position: row.position,
+    token: row.access_token || row.token || 'EMP-1000',
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+  };
+}
 
 /**
  * Mapeo de TripRelation (TypeScript) a trip_relations (PostgreSQL) en VES
@@ -80,7 +104,65 @@ function mapExpenseFromDb(row: any): Expense {
 }
 
 // -------------------------------------------------------------
-// Funciones de consulta y persistencia en Supabase
+// Funciones de consulta y persistencia de Empleados en Supabase
+// -------------------------------------------------------------
+
+export async function fetchEmployeesFromSupabase(): Promise<EmployeeProfile[] | null> {
+  if (!supabase || !isSupabaseConfigured()) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.warn('Error leyendo colaboradores de Supabase:', error.message);
+      return null;
+    }
+
+    return (data || []).map(mapEmployeeFromDb);
+  } catch (err) {
+    console.warn('Excepción consultando colaboradores en Supabase:', err);
+    return null;
+  }
+}
+
+export async function upsertEmployeeInSupabase(employee: EmployeeProfile): Promise<boolean> {
+  if (!supabase || !isSupabaseConfigured()) return false;
+
+  try {
+    const payload = mapEmployeeToDb(employee);
+    const { error } = await supabase.from('employees').upsert(payload);
+    if (error) {
+      console.error('Error guardando colaborador en Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Excepción guardando colaborador en Supabase:', err);
+    return false;
+  }
+}
+
+export async function deleteEmployeeFromSupabase(employeeId: string): Promise<boolean> {
+  if (!supabase || !isSupabaseConfigured()) return false;
+
+  try {
+    const { error } = await supabase.from('employees').delete().eq('id', employeeId);
+    if (error) {
+      console.error('Error eliminando colaborador en Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Excepción eliminando colaborador en Supabase:', err);
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// Funciones de consulta y persistencia de Relaciones en Supabase
 // -------------------------------------------------------------
 
 export async function fetchRelationsFromSupabase(): Promise<TripRelation[] | null> {
@@ -140,6 +222,10 @@ export async function updateRelationStatusInSupabase(relationId: string, status:
     return false;
   }
 }
+
+// -------------------------------------------------------------
+// Funciones de consulta y persistencia de Gastos en Supabase
+// -------------------------------------------------------------
 
 export async function fetchExpensesFromSupabase(): Promise<Expense[] | null> {
   if (!supabase || !isSupabaseConfigured()) return null;

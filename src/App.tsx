@@ -1,68 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { TripRelation, Expense, EmployeeProfile, PortalMode } from './types';
+import { 
+  TripRelation, 
+  Expense, 
+  EmployeeProfile, 
+  AuthSession, 
+  PortalMode, 
+  DEFAULT_ADMIN_TOKEN 
+} from './types';
 import { 
   loadRelations, 
   saveRelations, 
   loadExpenses, 
   saveExpenses, 
-  loadPortalMode, 
-  savePortalMode,
-  loadCurrentEmployee,
-  saveCurrentEmployee,
-  INITIAL_EMPLOYEES 
+  loadEmployees,
+  saveEmployees,
+  loadAdminToken,
+  saveAdminToken,
+  loadSession,
+  saveSession,
+  clearSession
 } from './utils/storage';
 import { TopBar } from './components/TopBar';
 import { EmployeePortal } from './components/EmployeePortal';
 import { AdminPortal } from './components/AdminPortal';
+import { LoginScreen } from './components/LoginScreen';
 import { ExpenseFormModal } from './components/ExpenseFormModal';
 import { CreateRelationModal } from './components/CreateRelationModal';
 import { ReceiptViewerModal } from './components/ReceiptViewerModal';
 import { PrintReportModal } from './components/PrintReportModal';
-import { SupabaseSetupModal } from './components/SupabaseSetupModal';
 import { 
   fetchRelationsFromSupabase, 
   fetchExpensesFromSupabase, 
+  fetchEmployeesFromSupabase,
   insertRelationInSupabase, 
   insertExpenseInSupabase, 
+  upsertEmployeeInSupabase,
+  deleteEmployeeFromSupabase,
   updateExpenseStatusInSupabase, 
   updateRelationStatusInSupabase 
 } from './services/supabaseService';
 import { isSupabaseConfigured } from './lib/supabase';
-import { CheckCircle2, Lock, ShieldCheck, Briefcase } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Briefcase } from 'lucide-react';
 
 export default function App() {
-  const [portalMode, setPortalMode] = useState<PortalMode>(() => loadPortalMode());
+  const [session, setSession] = useState<AuthSession | null>(() => loadSession());
+  const [employees, setEmployees] = useState<EmployeeProfile[]>(() => loadEmployees());
+  const [adminToken, setAdminToken] = useState<string>(() => loadAdminToken());
   const [relations, setRelations] = useState<TripRelation[]>(() => loadRelations());
   const [expenses, setExpenses] = useState<Expense[]>(() => loadExpenses());
-  const [employees] = useState<EmployeeProfile[]>(INITIAL_EMPLOYEES);
-  const [currentEmployeeName, setCurrentEmployeeName] = useState<string>(() => loadCurrentEmployee());
 
   // Modals state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [targetRelationIdForExpense, setTargetRelationIdForExpense] = useState<string | undefined>(undefined);
   const [isCreateRelationModalOpen, setIsCreateRelationModalOpen] = useState(false);
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [printRelation, setPrintRelation] = useState<TripRelation | null>(null);
   const [viewingReceiptExpense, setViewingReceiptExpense] = useState<Expense | null>(null);
-
-  // Sync from Supabase on mount if configured
-  useEffect(() => {
-    async function syncFromSupabase() {
-      if (isSupabaseConfigured()) {
-        const [cloudRels, cloudExps] = await Promise.all([
-          fetchRelationsFromSupabase(),
-          fetchExpensesFromSupabase(),
-        ]);
-        if (cloudRels && cloudRels.length > 0) {
-          setRelations(cloudRels);
-        }
-        if (cloudExps && cloudExps.length > 0) {
-          setExpenses(cloudExps);
-        }
-      }
-    }
-    syncFromSupabase();
-  }, []);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -74,7 +66,34 @@ export default function App() {
     }, 3500);
   };
 
+  // Sync from Supabase on mount if configured
+  useEffect(() => {
+    async function syncFromSupabase() {
+      if (isSupabaseConfigured()) {
+        const [cloudEmps, cloudRels, cloudExps] = await Promise.all([
+          fetchEmployeesFromSupabase(),
+          fetchRelationsFromSupabase(),
+          fetchExpensesFromSupabase(),
+        ]);
+        if (cloudEmps && cloudEmps.length > 0) {
+          setEmployees(cloudEmps);
+        }
+        if (cloudRels && cloudRels.length > 0) {
+          setRelations(cloudRels);
+        }
+        if (cloudExps && cloudExps.length > 0) {
+          setExpenses(cloudExps);
+        }
+      }
+    }
+    syncFromSupabase();
+  }, []);
+
   // Sync state to local storage
+  useEffect(() => {
+    saveEmployees(employees);
+  }, [employees]);
+
   useEffect(() => {
     saveRelations(relations);
   }, [relations]);
@@ -83,20 +102,72 @@ export default function App() {
     saveExpenses(expenses);
   }, [expenses]);
 
-  const handleChangePortalMode = (mode: PortalMode) => {
-    setPortalMode(mode);
-    savePortalMode(mode);
-    showToast(
-      mode === 'admin'
-        ? 'Accediendo al Panel de Administración y Finanzas'
-        : `Accediendo al Portal del Empleado (${currentEmployeeName})`
-    );
+  // Auth actions
+  const handleLoginEmployee = (emp: EmployeeProfile) => {
+    const newSession: AuthSession = {
+      role: 'employee',
+      employeeId: emp.id,
+      employeeName: emp.name,
+      token: emp.token,
+      loginTime: Date.now(),
+    };
+    setSession(newSession);
+    saveSession(newSession);
+    showToast(`Bienvenido al Portal, ${emp.name}`);
   };
 
-  const handleChangeEmployeeProfile = (name: string) => {
-    setCurrentEmployeeName(name);
-    saveCurrentEmployee(name);
-    showToast(`Cambiado a perfil de colaborador: ${name}`);
+  const handleLoginAdmin = () => {
+    const newSession: AuthSession = {
+      role: 'admin',
+      token: adminToken,
+      loginTime: Date.now(),
+    };
+    setSession(newSession);
+    saveSession(newSession);
+    showToast('Acceso autorizado a Panel de Administración y Finanzas');
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setSession(null);
+    showToast('Sesión cerrada correctamente.');
+  };
+
+  // Collaborator management
+  const handleCreateEmployee = (newEmpData: Omit<EmployeeProfile, 'id'>) => {
+    const newEmp: EmployeeProfile = {
+      ...newEmpData,
+      id: `emp-${Date.now()}`,
+    };
+    setEmployees(prev => [...prev, newEmp]);
+    upsertEmployeeInSupabase(newEmp);
+    showToast(`Colaborador ${newEmp.name} creado con token ${newEmp.token}`);
+  };
+
+  const handleUpdateEmployeeToken = (employeeId: string, newToken: string) => {
+    setEmployees(prev =>
+      prev.map(e => {
+        if (e.id === employeeId) {
+          const updated = { ...e, token: newToken };
+          upsertEmployeeInSupabase(updated);
+          return updated;
+        }
+        return e;
+      })
+    );
+    showToast('Token de acceso actualizado.');
+  };
+
+  const handleDeleteEmployee = (employeeId: string) => {
+    setEmployees(prev => prev.filter(e => e.id !== employeeId));
+    deleteEmployeeFromSupabase(employeeId);
+    showToast('Colaborador eliminado.');
+  };
+
+  const handleUpdateAdminToken = (newToken: string) => {
+    setAdminToken(newToken);
+    saveAdminToken(newToken);
+    showToast('Token de administrador actualizado con éxito.');
   };
 
   // Admin action: Create new trip relation
@@ -169,73 +240,72 @@ export default function App() {
     showToast('Relación cerrada y liquidada conforme.');
   };
 
-  // Employee object for current selected user
-  const currentEmployeeProfile =
-    employees.find(e => e.name === currentEmployeeName) || employees[0];
+  // Active authenticated user profile
+  const currentEmployeeProfile = session?.role === 'employee'
+    ? employees.find(e => e.id === session.employeeId || e.name === session.employeeName) || employees[0]
+    : undefined;
 
-  // Relations available for the employee modal
-  const relationsForModal =
-    portalMode === 'employee'
-      ? relations.filter(r => r.employeeName === currentEmployeeName)
-      : relations;
+  // Relations available for the employee modal (STRICT ISOLATION)
+  const relationsForModal = session?.role === 'employee'
+    ? relations.filter(r => r.employeeName === currentEmployeeProfile?.name)
+    : relations;
+
+  // IF NOT AUTHENTICATED -> SHOW LOGIN SCREEN
+  if (!session) {
+    return (
+      <LoginScreen
+        employees={employees}
+        adminToken={adminToken || DEFAULT_ADMIN_TOKEN}
+        onLoginEmployee={handleLoginEmployee}
+        onLoginAdmin={handleLoginAdmin}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans pb-16">
-      {/* Top Bar with Brand, Independent Portal Indicator and Supabase Status */}
+      {/* Top Bar with Brand, Identity Badge, and Logout */}
       <TopBar
-        portalMode={portalMode}
-        onChangePortalMode={handleChangePortalMode}
-        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
-        currentEmployeeName={currentEmployeeName}
+        portalMode={session.role}
+        currentEmployee={currentEmployeeProfile}
+        onLogout={handleLogout}
       />
 
       {/* Security & Access Strip */}
       <div className="bg-slate-100/90 border-b border-slate-200/80 px-4 py-2 text-xs no-print">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {portalMode === 'admin' ? (
+            {session.role === 'admin' ? (
               <>
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-bold text-emerald-950">Panel de Finanzas y Control:</span>
+                <span className="font-bold text-emerald-950">Panel de Administración y Finanzas:</span>
                 <span className="text-slate-600 hidden sm:inline">
-                  Vista confidencial. Aquí se crean las asignaciones de fondos y se aprueban las liquidaciones de todos los empleados.
+                  Acceso confidencial. Crea asignaciones en Bolívares, emite tokens de colaboradores y audita liquidaciones.
                 </span>
               </>
             ) : (
               <>
                 <Briefcase className="w-4 h-4 text-blue-600 shrink-0" />
-                <span className="font-bold text-blue-950">Portal Personal del Empleado:</span>
+                <span className="font-bold text-blue-950">Portal Exclusivo del Colaborador:</span>
                 <span className="text-slate-600 hidden sm:inline">
-                  Acceso exclusivo a tus viajes asignados. Registra comprobantes con foto contra tu fondo autorizado.
+                  Acceso restringido a tus viajes y asignaciones de fondos en Bolívares (Bs. VES).
                 </span>
               </>
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {portalMode === 'admin' ? (
-              <button
-                onClick={() => handleChangePortalMode('employee')}
-                className="text-[11px] font-bold text-blue-700 hover:text-blue-900 transition-colors"
-              >
-                Volver a Portal Empleado
-              </button>
-            ) : (
-              <button
-                onClick={() => handleChangePortalMode('admin')}
-                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 transition-colors flex items-center gap-1"
-              >
-                <Lock className="w-3 h-3" />
-                <span>Acceso Finanzas</span>
-              </button>
-            )}
-          </div>
+          <button
+            onClick={handleLogout}
+            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            Cambiar de Usuario
+          </button>
         </div>
       </div>
 
       {/* Main Container */}
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-8 flex-1">
-        {portalMode === 'employee' ? (
+        {session.role === 'employee' && currentEmployeeProfile ? (
           /* PORTAL INDEPENDIENTE DEL EMPLEADO */
           <EmployeePortal
             currentEmployee={currentEmployeeProfile}
@@ -247,8 +317,6 @@ export default function App() {
             }}
             onViewReceipt={expense => setViewingReceiptExpense(expense)}
             onSubmitRelation={handleSubmitRelation}
-            onChangeEmployeeProfile={handleChangeEmployeeProfile}
-            allEmployees={employees}
           />
         ) : (
           /* PANEL INDEPENDIENTE DEL ADMINISTRADOR / FINANZAS */
@@ -256,12 +324,28 @@ export default function App() {
             relations={relations}
             expenses={expenses}
             employees={employees}
+            adminToken={adminToken}
             onOpenCreateRelation={() => setIsCreateRelationModalOpen(true)}
             onApproveExpense={handleApproveExpense}
             onRejectExpense={handleRejectExpense}
             onSettleRelation={handleSettleRelation}
             onViewReceipt={expense => setViewingReceiptExpense(expense)}
             onOpenPrintReport={rel => setPrintRelation(rel)}
+            onCreateEmployee={handleCreateEmployee}
+            onUpdateEmployeeToken={handleUpdateEmployeeToken}
+            onDeleteEmployee={handleDeleteEmployee}
+            onUpdateAdminToken={handleUpdateAdminToken}
+            onSyncSupabase={async () => {
+              const [cloudEmps, cloudRels, cloudExps] = await Promise.all([
+                fetchEmployeesFromSupabase(),
+                fetchRelationsFromSupabase(),
+                fetchExpensesFromSupabase(),
+              ]);
+              if (cloudEmps && cloudEmps.length > 0) setEmployees(cloudEmps);
+              if (cloudRels && cloudRels.length > 0) setRelations(cloudRels);
+              if (cloudExps && cloudExps.length > 0) setExpenses(cloudExps);
+              showToast('Datos sincronizados exitosamente con Supabase.');
+            }}
           />
         )}
       </main>
@@ -284,7 +368,7 @@ export default function App() {
         onSave={handleCreateExpense}
         relations={relationsForModal}
         activeRelationId={targetRelationIdForExpense}
-        currentEmployeeName={currentEmployeeName}
+        currentEmployeeName={currentEmployeeProfile?.name || ''}
       />
 
       <CreateRelationModal
@@ -314,11 +398,6 @@ export default function App() {
           expenses={expenses}
         />
       )}
-
-      <SupabaseSetupModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
-      />
     </div>
   );
 }

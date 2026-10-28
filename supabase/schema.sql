@@ -2,12 +2,13 @@
 -- VIÁTICOSPRO - ESQUEMA DE BASE DE DATOS POSTGRESQL PARA SUPABASE (SOLO VES)
 -- ==============================================================================
 
--- 1. Tabla de Empleados / Perfiles
+-- 1. Tabla de Empleados / Perfiles con Token de Acceso Personal
 CREATE TABLE IF NOT EXISTS public.employees (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     department TEXT NOT NULL,
     position TEXT NOT NULL,
+    access_token TEXT NOT NULL DEFAULT 'EMP-1000',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS public.expenses (
 );
 
 -- 4. Índices para consultas de alto rendimiento
+CREATE INDEX IF NOT EXISTS idx_employees_token ON public.employees(access_token);
 CREATE INDEX IF NOT EXISTS idx_trip_relations_employee ON public.trip_relations(employee_name);
 CREATE INDEX IF NOT EXISTS idx_trip_relations_status ON public.trip_relations(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_relation_id ON public.expenses(relation_id);
@@ -65,12 +67,12 @@ CREATE POLICY "Acceso público lectura/escritura relaciones" ON public.trip_rela
 CREATE POLICY "Acceso público lectura/escritura gastos" ON public.expenses
     FOR ALL USING (true) WITH CHECK (true);
 
--- 6. Datos Iniciales de Demostración (en Bolívares Bs.)
-INSERT INTO public.employees (id, name, department, position) VALUES
-    ('emp-01', 'Jesús R. López', 'Operaciones e Ingeniería', 'Ingeniero de Proyectos Senior'),
-    ('emp-02', 'Mariana Rondón', 'Comercial y Ventas', 'Líder de Cuentas Corporativas'),
-    ('emp-03', 'Carlos Mendoza', 'Tecnología e Infraestructura', 'Especialista en Sistemas')
-ON CONFLICT (id) DO NOTHING;
+-- 6. Datos Iniciales de Demostración (con Tokens en Bolívares Bs.)
+INSERT INTO public.employees (id, name, department, position, access_token) VALUES
+    ('emp-01', 'Jesús R. López', 'Operaciones e Ingeniería', 'Ingeniero de Proyectos Senior', 'EMP-1024'),
+    ('emp-02', 'Mariana Rondón', 'Comercial y Ventas', 'Líder de Cuentas Corporativas', 'EMP-2048'),
+    ('emp-03', 'Carlos Mendoza', 'Tecnología e Infraestructura', 'Especialista en Sistemas', 'EMP-4096')
+ON CONFLICT (id) DO UPDATE SET access_token = EXCLUDED.access_token;
 
 INSERT INTO public.trip_relations (id, code, title, destination, employee_name, allocated_budget_ves, start_date, end_date, status, admin_notes) VALUES
     ('rel-valencia-001', 'REL-2026-001', 'Auditoría Planta Valencia - Q4', 'Valencia, Carabobo', 'Jesús R. López', 24000.00, '2026-10-24', '2026-10-29', 'open', 'Viáticos autorizados en Bolívares para inspección técnica en planta. Hospedaje y traslado incluidos.'),

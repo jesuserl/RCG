@@ -1,10 +1,11 @@
-import { Expense, TripRelation, EmployeeProfile, PortalMode } from '../types';
+import { Expense, TripRelation, EmployeeProfile, AuthSession, DEFAULT_ADMIN_TOKEN } from '../types';
 import { generateSampleReceiptSvg } from './sampleReceipts';
 
-const STORAGE_KEY_RELATIONS = 'viaticos_relations_ves_v3';
-const STORAGE_KEY_EXPENSES = 'viaticos_expenses_ves_v3';
-const STORAGE_KEY_PORTAL_MODE = 'viaticos_portal_mode_ves_v3';
-const STORAGE_KEY_CURRENT_EMPLOYEE = 'viaticos_current_employee_ves_v3';
+const STORAGE_KEY_RELATIONS = 'viaticos_relations_ves_v4';
+const STORAGE_KEY_EXPENSES = 'viaticos_expenses_ves_v4';
+const STORAGE_KEY_EMPLOYEES = 'viaticos_employees_ves_v4';
+const STORAGE_KEY_SESSION = 'viaticos_auth_session_ves_v4';
+const STORAGE_KEY_ADMIN_TOKEN = 'viaticos_admin_token_ves_v4';
 
 export const INITIAL_EMPLOYEES: EmployeeProfile[] = [
   {
@@ -12,18 +13,24 @@ export const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     name: 'Jesús R. López',
     department: 'Operaciones e Ingeniería',
     position: 'Ingeniero de Proyectos Senior',
+    token: 'EMP-1024',
+    createdAt: Date.now() - 1000 * 60 * 60 * 200,
   },
   {
     id: 'emp-02',
     name: 'Mariana Rondón',
     department: 'Comercial y Ventas',
     position: 'Líder de Cuentas Corporativas',
+    token: 'EMP-2048',
+    createdAt: Date.now() - 1000 * 60 * 60 * 180,
   },
   {
     id: 'emp-03',
     name: 'Carlos Mendoza',
     department: 'Tecnología e Infraestructura',
     position: 'Especialista en Sistemas',
+    token: 'EMP-4096',
+    createdAt: Date.now() - 1000 * 60 * 60 * 150,
   },
 ];
 
@@ -162,6 +169,76 @@ export const INITIAL_EXPENSES: Expense[] = [
   },
 ];
 
+export function loadEmployees(): EmployeeProfile[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_EMPLOYEES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(INITIAL_EMPLOYEES));
+      return INITIAL_EMPLOYEES;
+    }
+    const parsed = JSON.parse(raw);
+    // ensure all employees have tokens
+    return parsed.map((e: any, idx: number) => ({
+      ...e,
+      token: e.token || `EMP-${(idx + 1) * 1000}`,
+    }));
+  } catch (e) {
+    console.error('Error cargando colaboradores', e);
+    return INITIAL_EMPLOYEES;
+  }
+}
+
+export function saveEmployees(employees: EmployeeProfile[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
+  } catch (e) {
+    console.error('Error guardando colaboradores', e);
+  }
+}
+
+export function loadAdminToken(): string {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ADMIN_TOKEN);
+    return raw || DEFAULT_ADMIN_TOKEN;
+  } catch {
+    return DEFAULT_ADMIN_TOKEN;
+  }
+}
+
+export function saveAdminToken(token: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_ADMIN_TOKEN, token);
+  } catch (e) {
+    console.error('Error guardando token de admin', e);
+  }
+}
+
+export function loadSession(): AuthSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_SESSION);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function saveSession(session: AuthSession): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(session));
+  } catch (e) {
+    console.error('Error guardando sesión', e);
+  }
+}
+
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_SESSION);
+  } catch (e) {
+    console.error('Error limpiando sesión', e);
+  }
+}
+
 export function loadRelations(): TripRelation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_RELATIONS);
@@ -203,41 +280,5 @@ export function saveExpenses(expenses: Expense[]): void {
     localStorage.setItem(STORAGE_KEY_EXPENSES, JSON.stringify(expenses));
   } catch (e) {
     console.error('Error guardando gastos', e);
-  }
-}
-
-export function loadPortalMode(): PortalMode {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_PORTAL_MODE);
-    if (raw === 'employee' || raw === 'admin') return raw;
-    return 'employee';
-  } catch {
-    return 'employee';
-  }
-}
-
-export function savePortalMode(mode: PortalMode): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_PORTAL_MODE, mode);
-  } catch (e) {
-    console.error('Error guardando portal mode', e);
-  }
-}
-
-export function loadCurrentEmployee(): string {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_CURRENT_EMPLOYEE);
-    if (raw) return raw;
-    return INITIAL_EMPLOYEES[0].name;
-  } catch {
-    return INITIAL_EMPLOYEES[0].name;
-  }
-}
-
-export function saveCurrentEmployee(employeeName: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_CURRENT_EMPLOYEE, employeeName);
-  } catch (e) {
-    console.error('Error guardando empleado activo', e);
   }
 }

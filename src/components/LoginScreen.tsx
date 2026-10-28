@@ -1,0 +1,331 @@
+import React, { useState } from 'react';
+import { EmployeeProfile, DEFAULT_ADMIN_TOKEN } from '../types';
+import { 
+  KeyRound, 
+  ShieldCheck, 
+  User, 
+  Lock, 
+  AlertCircle, 
+  Coins, 
+  Eye, 
+  EyeOff,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight
+} from 'lucide-react';
+
+interface LoginScreenProps {
+  employees: EmployeeProfile[];
+  adminToken: string;
+  onLoginEmployee: (employee: EmployeeProfile) => void;
+  onLoginAdmin: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  employees,
+  adminToken,
+  onLoginEmployee,
+  onLoginAdmin,
+}) => {
+  const [activeTab, setActiveTab] = useState<'employee' | 'admin'>('employee');
+
+  // Employee login state
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(employees[0]?.id || '');
+  const [employeeTokenInput, setEmployeeTokenInput] = useState<string>('');
+  const [showEmployeeToken, setShowEmployeeToken] = useState<boolean>(false);
+  const [employeeError, setEmployeeError] = useState<string | null>(null);
+
+  // Admin login state
+  const [adminTokenInput, setAdminTokenInput] = useState<string>('');
+  const [showAdminToken, setShowAdminToken] = useState<boolean>(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || employees[0];
+
+  const handleEmployeeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmployeeError(null);
+
+    if (!selectedEmployee) {
+      setEmployeeError('Por favor selecciona un colaborador.');
+      return;
+    }
+
+    const trimmedInput = employeeTokenInput.trim();
+    if (!trimmedInput) {
+      setEmployeeError('Por favor ingresa tu token personal de acceso.');
+      return;
+    }
+
+    if (trimmedInput !== selectedEmployee.token.trim()) {
+      setEmployeeError('Token incorrecto. Verifica con el Administrador de Finanzas.');
+      return;
+    }
+
+    onLoginEmployee(selectedEmployee);
+  };
+
+  const handleAdminSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminError(null);
+
+    const trimmedInput = adminTokenInput.trim();
+    if (!trimmedInput) {
+      setAdminError('Ingresa el token de administración.');
+      return;
+    }
+
+    const targetToken = adminToken || DEFAULT_ADMIN_TOKEN;
+    if (trimmedInput !== targetToken.trim()) {
+      setAdminError('Token de administrador no válido.');
+      return;
+    }
+
+    onLoginAdmin();
+  };
+
+  const fillDemoEmployeeToken = () => {
+    if (selectedEmployee) {
+      setEmployeeTokenInput(selectedEmployee.token);
+      setEmployeeError(null);
+    }
+  };
+
+  const fillDemoAdminToken = () => {
+    setAdminTokenInput(adminToken || DEFAULT_ADMIN_TOKEN);
+    setAdminError(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 text-white flex flex-col justify-between p-4 sm:p-6 font-sans">
+      {/* Brand Header */}
+      <header className="max-w-md w-full mx-auto pt-6 sm:pt-10 text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white font-black text-2xl shadow-xl shadow-blue-600/30 mb-3">
+          V
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          ViáticosPro
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          Sistema de Control y Rendición de Viáticos en Bolívares (Bs. VES)
+        </p>
+
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-full text-[11px] font-semibold text-slate-300 mt-3 font-mono-numbers">
+          <Coins className="w-3.5 h-3.5 text-blue-400" />
+          <span>Moneda Operativa Oficial: Bs. VES</span>
+        </div>
+      </header>
+
+      {/* Main Login Card */}
+      <div className="max-w-md w-full mx-auto my-6 bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-2 p-1 bg-slate-800/90 rounded-2xl mb-6 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('employee');
+              setEmployeeError(null);
+            }}
+            className={`py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'employee'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>Colaborador</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('admin');
+              setAdminError(null);
+            }}
+            className={`py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'admin'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Administrador</span>
+          </button>
+        </div>
+
+        {/* Form 1: Colaborador */}
+        {activeTab === 'employee' && (
+          <form onSubmit={handleEmployeeSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                Selecciona tu Nombre:
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedEmployeeId}
+                  onChange={e => {
+                    setSelectedEmployeeId(e.target.value);
+                    setEmployeeTokenInput('');
+                    setEmployeeError(null);
+                  }}
+                  className="w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+                >
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} — {emp.department}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedEmployee && (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Cargo: <span className="text-slate-300">{selectedEmployee.position}</span>
+                </p>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Token de Acceso Personal:
+                </label>
+                {selectedEmployee && (
+                  <button
+                    type="button"
+                    onClick={fillDemoEmployeeToken}
+                    className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Auto-rellenar demo ({selectedEmployee.token})</span>
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <input
+                  type={showEmployeeToken ? 'text' : 'password'}
+                  placeholder="Ej. EMP-1024"
+                  value={employeeTokenInput}
+                  onChange={e => {
+                    setEmployeeTokenInput(e.target.value);
+                    if (employeeError) setEmployeeError(null);
+                  }}
+                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-mono tracking-wider focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEmployeeToken(!showEmployeeToken)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white"
+                >
+                  {showEmployeeToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {employeeError && (
+              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <span>{employeeError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 text-sm mt-2 cursor-pointer"
+            >
+              <span>Ingresar a mi Portal</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400">
+              <span className="font-bold text-slate-300 block mb-0.5">Aviso de Privacidad y Seguridad:</span>
+              Cada colaborador únicamente tiene acceso a sus viajes asignados en Bolívares y sus comprobantes de gastos.
+            </div>
+          </form>
+        )}
+
+        {/* Form 2: Administrador */}
+        {activeTab === 'admin' && (
+          <form onSubmit={handleAdminSubmit} className="space-y-4">
+            <div className="p-3.5 bg-emerald-950/40 border border-emerald-800/70 rounded-2xl flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-600/40">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="text-xs">
+                <span className="font-bold text-emerald-300 block">Acceso Administrativo y Finanzas</span>
+                <span className="text-emerald-400/80 text-[11px]">
+                  Crea relaciones en Bolívares, administra colaboradores, gestiona tokens y audita facturas.
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Token Maestro de Finanzas:
+                </label>
+                <button
+                  type="button"
+                  onClick={fillDemoAdminToken}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Auto-rellenar demo ({adminToken || DEFAULT_ADMIN_TOKEN})</span>
+                </button>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showAdminToken ? 'text' : 'password'}
+                  placeholder="Ej. ADMIN-2026"
+                  value={adminTokenInput}
+                  onChange={e => {
+                    setAdminTokenInput(e.target.value);
+                    if (adminError) setAdminError(null);
+                  }}
+                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-mono tracking-wider focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdminToken(!showAdminToken)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white"
+                >
+                  {showAdminToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {adminError && (
+              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <span>{adminError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 text-sm mt-2 cursor-pointer"
+            >
+              <span>Acceder al Panel de Administración</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <div className="bg-slate-800/50 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400">
+              <span className="font-bold text-slate-300 block mb-0.5">Control Centralizado:</span>
+              La configuración de la base de datos Supabase y la emisión de tokens de colaboradores se gestionan dentro de este panel.
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Footer System Info */}
+      <footer className="text-center pb-4 text-xs text-slate-500">
+        <p>ViáticosPro &copy; 2026 · Despliegue en Vercel con Base de Datos Supabase</p>
+      </footer>
+    </div>
+  );
+};

@@ -44,6 +44,16 @@ export interface EmployeeProfile {
   name: string;
   department: string;
   position: string;
+  token: string;              // Token secreto de acceso del colaborador (ej. EMP-1024)
+  createdAt?: number;
+}
+
+export interface AuthSession {
+  role: 'employee' | 'admin';
+  employeeId?: string;
+  employeeName?: string;
+  token: string;
+  loginTime: number;
 }
 
 export type PortalMode = 'login' | 'employee' | 'admin';
@@ -51,3 +61,5 @@ export type PortalMode = 'login' | 'employee' | 'admin';
 export type UserRole = 'employee' | 'finance';
 
 export type TripProject = TripRelation;
+
+export const DEFAULT_ADMIN_TOKEN = 'ADMIN-2026';
