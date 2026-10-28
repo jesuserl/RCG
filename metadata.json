@@ -1,0 +1,6 @@
+{
+  "name": "ViáticosPro - Control y Liquidación de Gastos",
+  "description": "Aplicación móvil y web para registro de viáticos en viajes de negocios y validación contable bimonetaria ($ y Bs BCV).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

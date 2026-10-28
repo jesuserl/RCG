@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan de arquitectura y especificación técnica para la aplicación de Control y Liquidación de Gastos de Viáticos (ViáticosPro). Incluye modelo de datos bimonetario ($ y Bs BCV), modo dual Empleado/Finanzas, captura y visor de facturas, dashboard analítico y exportación de reportes.",
+  "updatedAt":  "2026-10-28T20:03:04.785871680Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
