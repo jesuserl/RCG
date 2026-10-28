@@ -1,6 +1,6 @@
 import React from 'react';
 import { TripRelation, Expense } from '../types';
-import { Printer, X, Download, ShieldCheck, Building } from 'lucide-react';
+import { Printer, X, Download } from 'lucide-react';
 import { exportExpensesToCsv } from '../utils/exportCsv';
 
 interface PrintReportModalProps {
@@ -8,7 +8,6 @@ interface PrintReportModalProps {
   onClose: () => void;
   relation: TripRelation;
   expenses: Expense[];
-  bcvRate: number;
 }
 
 export const PrintReportModal: React.FC<PrintReportModalProps> = ({
@@ -16,29 +15,24 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
   onClose,
   relation,
   expenses,
-  bcvRate,
 }) => {
   if (!isOpen) return null;
 
   // Filter only expenses for this specific relation
   const relExpenses = expenses.filter(e => e.relationId === relation.id);
 
-  const totalUsd = relExpenses.reduce((sum, e) => sum + e.amountUsd, 0);
-  const totalVes = relExpenses.reduce((sum, e) => sum + e.amountVes, 0);
+  const totalSpentVes = relExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const budgetVes = relation.allocatedBudget;
 
-  const budgetUsd = relation.allocatedBudgetUsd;
-  const budgetVes = budgetUsd * bcvRate;
-
-  const diffUsd = budgetUsd - totalUsd;
-  const diffVes = budgetVes - totalVes;
-  const isEmployeeRefund = diffUsd < 0; // Gastó más de lo asignado, la empresa le debe reembolsar
+  const diffVes = budgetVes - totalSpentVes;
+  const isEmployeeRefund = diffVes < 0; // Gastó más de lo asignado, la empresa le debe reembolsar
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleExportCsv = () => {
-    exportExpensesToCsv(relExpenses, undefined, `liquidacion_${relation.code.toLowerCase()}`);
+    exportExpensesToCsv(relExpenses, relation, `liquidacion_${relation.code.toLowerCase()}`);
   };
 
   const currentDate = new Date().toLocaleDateString('es-ES', {
@@ -54,7 +48,7 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 no-print">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Vista Previa de Liquidación de Viáticos
+              Vista Previa de Liquidación de Viáticos (Bs. VES)
             </h3>
             <p className="text-xs text-slate-500">
               Documento formal listo para impresión o exportación contable
@@ -135,9 +129,9 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
               </span>
             </div>
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Tasa Oficial BCV:</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Moneda de Liquidación:</span>
               <span className="text-xs font-bold text-blue-700 font-mono-numbers">
-                Bs. {bcvRate.toFixed(2)} por 1 USD
+                Bolívares (VES)
               </span>
             </div>
           </div>
@@ -154,10 +148,9 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                     <th className="p-2.5">Fecha</th>
                     <th className="p-2.5">Categoría</th>
                     <th className="p-2.5">Concepto / Razón</th>
-                    <th className="p-2.5 text-center">Estado</th>
-                    <th className="p-2.5 text-right font-mono-numbers">Monto Orig.</th>
-                    <th className="p-2.5 text-right font-mono-numbers">Equiv. USD ($)</th>
-                    <th className="p-2.5 text-right font-mono-numbers">Equiv. Bs.</th>
+                    <th className="p-2.5 text-center">Estado Auditoría</th>
+                    <th className="p-2.5 text-center">Comprobante</th>
+                    <th className="p-2.5 text-right font-mono-numbers">Monto Liquidado (Bs.)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -174,22 +167,19 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                         )}
                       </td>
                       <td className="p-2.5 text-center">
-                        <span className={`inline-block text-[10px] font-bold ${
-                          exp.status === 'approved' ? 'text-emerald-700' :
-                          exp.status === 'pending' ? 'text-amber-700' : 'text-rose-700'
+                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          exp.status === 'approved' ? 'bg-emerald-100 text-emerald-800' :
+                          exp.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
                         }`}>
                           {exp.status === 'approved' ? 'APROBADO' :
                            exp.status === 'pending' ? 'PENDIENTE' : 'OBSERVADO'}
                         </span>
                       </td>
-                      <td className="p-2.5 text-right font-mono-numbers whitespace-nowrap text-slate-800">
-                        {exp.currency === 'USD' ? '$' : 'Bs.'} {exp.amount.toFixed(2)}
+                      <td className="p-2.5 text-center text-slate-500 text-[10px]">
+                        {exp.receiptFileName || (exp.receiptUrl ? 'Factura Adjunta' : 'Sin soporte')}
                       </td>
                       <td className="p-2.5 text-right font-mono-numbers font-semibold text-slate-900 whitespace-nowrap">
-                        $ {exp.amountUsd.toFixed(2)}
-                      </td>
-                      <td className="p-2.5 text-right font-mono-numbers font-semibold text-slate-900 whitespace-nowrap">
-                        Bs. {exp.amountVes.toFixed(2)}
+                        Bs. {exp.amount.toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -200,10 +190,7 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
                       Total Gastos Registrados ({relExpenses.length} comprobantes):
                     </td>
                     <td className="p-2.5 text-right font-mono-numbers whitespace-nowrap">
-                      $ {totalUsd.toFixed(2)}
-                    </td>
-                    <td className="p-2.5 text-right font-mono-numbers whitespace-nowrap">
-                      Bs. {totalVes.toFixed(2)}
+                      Bs. {totalSpentVes.toFixed(2)}
                     </td>
                   </tr>
                 </tfoot>
@@ -214,22 +201,22 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
           {/* Financial Balance Summary Box */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Presupuesto Asignado</span>
-              <div className="text-sm font-extrabold text-slate-900 font-mono-numbers mt-0.5">
-                $ {budgetUsd.toFixed(2)} USD
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Fondo Asignado por Administración</span>
+              <div className="text-base font-extrabold text-slate-900 font-mono-numbers mt-0.5">
+                Bs. {budgetVes.toFixed(2)}
               </div>
-              <span className="text-[10px] text-slate-500 font-mono-numbers">
-                ≈ Bs. {budgetVes.toFixed(2)}
+              <span className="text-[10px] text-slate-500">
+                Presupuesto aprobado para la comisión
               </span>
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Liquidado</span>
-              <div className="text-sm font-extrabold text-slate-900 font-mono-numbers mt-0.5">
-                $ {totalUsd.toFixed(2)} USD
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Gastado y Comprobado</span>
+              <div className="text-base font-extrabold text-slate-900 font-mono-numbers mt-0.5">
+                Bs. {totalSpentVes.toFixed(2)}
               </div>
-              <span className="text-[10px] text-slate-500 font-mono-numbers">
-                ≈ Bs. {totalVes.toFixed(2)}
+              <span className="text-[10px] text-slate-500">
+                Suma de comprobantes consignados
               </span>
             </div>
 
@@ -241,11 +228,11 @@ export const PrintReportModal: React.FC<PrintReportModalProps> = ({
               <span className="text-[10px] uppercase font-bold block">
                 {isEmployeeRefund ? 'Saldo a Reembolsar al Empleado:' : 'Saldo a Devolver a la Empresa:'}
               </span>
-              <div className="text-sm font-black font-mono-numbers mt-0.5">
-                $ {Math.abs(diffUsd).toFixed(2)} USD
+              <div className="text-base font-black font-mono-numbers mt-0.5">
+                Bs. {Math.abs(diffVes).toFixed(2)}
               </div>
-              <span className="text-[10px] font-mono-numbers">
-                ≈ Bs. {Math.abs(diffVes).toFixed(2)}
+              <span className="text-[10px]">
+                {isEmployeeRefund ? 'Excedente a favor del colaborador' : 'Remanente a reintegrar a caja'}
               </span>
             </div>
           </div>

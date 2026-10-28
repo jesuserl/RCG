@@ -7,7 +7,7 @@ interface ReceiptViewerModalProps {
   receiptUrl?: string;
   concept: string;
   amount: number;
-  currency: string;
+  currency?: string;
   date: string;
   fileName?: string;
 }
@@ -18,7 +18,7 @@ export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
   receiptUrl,
   concept,
   amount,
-  currency,
+  currency = 'Bs.',
   date,
   fileName,
 }) => {
@@ -53,7 +53,7 @@ export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
               <span>{date}</span>
               <span aria-hidden="true">·</span>
               <span className="font-mono-numbers font-medium text-slate-700">
-                {currency === 'USD' ? '$' : 'Bs.'} {amount.toFixed(2)}
+                Bs. {amount.toFixed(2)}
               </span>
               {fileName && (
                 <>

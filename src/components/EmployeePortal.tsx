@@ -11,21 +11,16 @@ import {
   AlertCircle, 
   Calendar, 
   MapPin, 
-  DollarSign, 
   FolderCheck, 
   MessageSquare,
-  ShieldAlert,
-  ChevronRight,
   User,
-  Info
+  Coins
 } from 'lucide-react';
 
 interface EmployeePortalProps {
   currentEmployee: EmployeeProfile;
   relations: TripRelation[];
   expenses: Expense[];
-  bcvRate: number;
-  currencyDisplay: 'USD' | 'VES';
   onOpenNewExpense: (relationId: string) => void;
   onViewReceipt: (expense: Expense) => void;
   onSubmitRelation: (relationId: string) => void;
@@ -37,8 +32,6 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   currentEmployee,
   relations,
   expenses,
-  bcvRate,
-  currencyDisplay,
   onOpenNewExpense,
   onViewReceipt,
   onSubmitRelation,
@@ -58,23 +51,12 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
     ? expenses.filter(e => e.relationId === activeRelation.id)
     : [];
 
-  // Financial calculations
-  const totalSpentUsd = relationExpenses.reduce((sum, e) => sum + e.amountUsd, 0);
-  const totalSpentVes = relationExpenses.reduce((sum, e) => sum + e.amountVes, 0);
-
-  const budgetUsd = activeRelation ? activeRelation.allocatedBudgetUsd : 0;
-  const budgetVes = budgetUsd * bcvRate;
-
-  const remainingUsd = budgetUsd - totalSpentUsd;
-  const remainingVes = remainingUsd * bcvRate;
-  const isOverBudget = remainingUsd < 0;
-
-  const currentSpent = currencyDisplay === 'USD' ? totalSpentUsd : totalSpentVes;
-  const currentBudget = currencyDisplay === 'USD' ? budgetUsd : budgetVes;
-  const currentRemaining = currencyDisplay === 'USD' ? remainingUsd : remainingVes;
-  const currencySymbol = currencyDisplay === 'USD' ? '$' : 'Bs.';
-
-  const progressPercent = budgetUsd > 0 ? (totalSpentUsd / budgetUsd) * 100 : 0;
+  // Financial calculations in Bolívares (Bs.)
+  const totalSpent = relationExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const budget = activeRelation ? activeRelation.allocatedBudget : 0;
+  const remaining = budget - totalSpent;
+  const isOverBudget = remaining < 0;
+  const progressPercent = budget > 0 ? (totalSpent / budget) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -122,7 +104,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
           <FolderCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-800">No tienes viajes ni relaciones asignadas</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-            El área de Finanzas y Administración aún no ha creado una relación de viáticos para tu usuario. Una vez asignada, aparecerá aquí con su presupuesto.
+            El área de Finanzas aún no ha creado una relación de viáticos para tu usuario. Una vez asignada, aparecerá aquí con su presupuesto en Bolívares.
           </p>
         </div>
       ) : (
@@ -176,12 +158,12 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
 
                     {activeRelation.adminNotes && (
                       <p className="text-xs text-slate-300 mt-2 bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60 max-w-2xl">
-                        <strong className="text-blue-300">Instrucciones del Administrador:</strong> {activeRelation.adminNotes}
+                        <strong className="text-blue-300">Instrucciones de Finanzas:</strong> {activeRelation.adminNotes}
                       </p>
                     )}
                   </div>
 
-                  {/* Status & Primary Action Button */}
+                  {/* Status & Action Buttons */}
                   <div className="flex flex-col sm:items-end gap-2 shrink-0">
                     <div>
                       {activeRelation.status === 'open' && (
@@ -230,19 +212,19 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 </div>
               </div>
 
-              {/* Budget & Execution Dashboard */}
+              {/* Budget & Execution Dashboard in VES */}
               <div className="p-5 sm:p-6 bg-slate-50/50 border-b border-slate-100">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Presupuesto Asignado (ReadOnly) */}
+                  {/* Presupuesto Asignado en Bs. */}
                   <div className="p-4 bg-white rounded-xl border border-slate-200">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                       Fondo Asignado por Empresa
                     </span>
                     <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono-numbers">
-                      {currencySymbol} {currentBudget.toFixed(2)}
+                      Bs. {budget.toFixed(2)}
                     </div>
                     <span className="text-[11px] text-slate-400 font-mono-numbers block mt-1">
-                      {currencyDisplay === 'USD' ? `≈ Bs. ${budgetVes.toFixed(2)}` : `≈ $ ${budgetUsd.toFixed(2)} USD`}
+                      Monto autorizado para la comisión
                     </span>
                   </div>
 
@@ -252,7 +234,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                       Total Comprobantes Cargados
                     </span>
                     <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono-numbers">
-                      {currencySymbol} {currentSpent.toFixed(2)}
+                      Bs. {totalSpent.toFixed(2)}
                     </div>
                     <span className="text-[11px] text-slate-400 font-mono-numbers block mt-1">
                       {relationExpenses.length} facturas registradas
@@ -269,7 +251,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                       {isOverBudget ? 'Fondo Excedido (Sobregiro):' : 'Saldo Disponible:'}
                     </span>
                     <div className="text-xl sm:text-2xl font-black font-mono-numbers">
-                      {currencySymbol} {Math.abs(currentRemaining).toFixed(2)}
+                      Bs. {Math.abs(remaining).toFixed(2)}
                     </div>
                     <span className="text-[11px] font-mono-numbers block mt-1 opacity-80">
                       {progressPercent.toFixed(1)}% del fondo ejecutado
@@ -298,7 +280,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                       Comprobantes y Facturas de este Viaje ({relationExpenses.length})
                     </h4>
                     <p className="text-xs text-slate-500">
-                      Los gastos que cargues se descontarán de tu fondo asignado
+                      Gastos justificados en Bolívares (Bs. VES)
                     </p>
                   </div>
 
@@ -401,12 +383,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                           <div className="flex items-center gap-3 shrink-0">
                             <div className="text-right">
                               <span className="text-sm font-bold text-slate-900 font-mono-numbers block">
-                                {expense.currency === 'USD' ? '$' : 'Bs.'} {expense.amount.toFixed(2)}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono-numbers">
-                                {expense.currency === 'USD'
-                                  ? `≈ Bs. ${expense.amountVes.toFixed(2)}`
-                                  : `≈ $ ${expense.amountUsd.toFixed(2)} USD`}
+                                Bs. {expense.amount.toFixed(2)}
                               </span>
                             </div>
 

@@ -1,14 +1,16 @@
 # Control de Gastos de Viáticos (ViáticosPro)
 
-Aplicación web y móvil responsiva (Mobile-First) diseñada para registrar de forma ágil los gastos generados en viajes de negocios y facilitar la revisión, validación y liquidación contable por parte del área de Finanzas.
+Aplicación web y móvil responsiva (Mobile-First) diseñada para el control y rendición ágil de viáticos de viaje con portales independientes para Colaboradores y Finanzas/Administración, operando exclusivamente en **Bolívares (VES)**, y preparada para despliegue en **Vercel** con persistencia en **Supabase (PostgreSQL)**.
 
 ## Decisiones Críticas y Preferencias del Usuario
 
 > [!IMPORTANT]
-> A partir de las aclaraciones recibidas, la aplicación incorpora:
-> - **Modo Dual de Roles**: Selector de vista instantáneo entre **Empleado** (registro rápido de viáticos, consulta de presupuesto y comprobantes) y **Finanzas** (auditoría de comprobantes, aprobación/rechazo con observaciones y ajuste de presupuestos).
-> - **Esquema Bimonetario ($ USD y Bs BCV)**: Soporte nativo para registrar en Dólares ($) o Bolívares (Bs), con tasa oficial BCV parametrizable en vivo y totalización simultánea en ambas monedas.
-> - **Comprobantes Reales & Previsualizador**: Carga de imágenes reales (cámara o galería) con almacenamiento local persistente (`localStorage` / DataURL), zoom interactivo y visor modal a pantalla completa.
+> A partir de las aclaraciones y requerimientos expresos del usuario:
+> - **Portales Estrictamente Independientes**:
+>   - **Portal del Empleado**: Vista restringida a los viajes y comisiones asignadas a su nombre. El colaborador no puede ver presupuestos ni gastos de otros empleados, no puede alterar el fondo autorizado, y carga sus comprobantes contra la relación asignada.
+>   - **Panel de Finanzas y Control (Administrador)**: Permite crear relaciones de viaje, asignar el fondo autorizado en Bolívares, auditar comprobantes (aprobar/observar con notas de auditoría) y liquidar el viaje.
+> - **Moneda Exclusiva en Bolívares (Bs. VES)**: Se eliminó todo rastro de USD y tasas de conversión BCV. Todas las relaciones, presupuestos, gastos, donas de desglose, reportes CSV y planillas de liquidación operan y totalizan estrictamente en Bolívares (`Bs.`).
+> - **Infraestructura Vercel & Supabase**: Configurado archivo `vercel.json` para despliegue en Vercel, esquema SQL `supabase/schema.sql` para PostgreSQL en Supabase, y cliente `@supabase/supabase-js` con fallback reactivo a `localStorage`.
 
 ---
 

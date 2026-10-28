@@ -5,38 +5,29 @@ import { PieChart as PieChartIcon } from 'lucide-react';
 
 interface CategoryBreakdownProps {
   expenses: Expense[];
-  currencyDisplay: 'USD' | 'VES';
 }
 
-export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
-  expenses,
-  currencyDisplay,
-}) => {
+export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ expenses }) => {
   const [hoveredCategory, setHoveredCategory] = useState<ExpenseCategory | null>(null);
 
-  // Group amounts by category
-  const categoryTotals: Record<ExpenseCategory, { count: number; totalUsd: number; totalVes: number }> = {
-    Hospedaje: { count: 0, totalUsd: 0, totalVes: 0 },
-    Alimentación: { count: 0, totalUsd: 0, totalVes: 0 },
-    Transporte: { count: 0, totalUsd: 0, totalVes: 0 },
-    Combustible: { count: 0, totalUsd: 0, totalVes: 0 },
-    Otros: { count: 0, totalUsd: 0, totalVes: 0 },
+  // Group amounts by category in Bolívares
+  const categoryTotals: Record<ExpenseCategory, { count: number; total: number }> = {
+    Hospedaje: { count: 0, total: 0 },
+    Alimentación: { count: 0, total: 0 },
+    Transporte: { count: 0, total: 0 },
+    Combustible: { count: 0, total: 0 },
+    Otros: { count: 0, total: 0 },
   };
 
-  let grandTotalUsd = 0;
-  let grandTotalVes = 0;
+  let grandTotal = 0;
 
   expenses.forEach(e => {
     if (categoryTotals[e.category]) {
       categoryTotals[e.category].count += 1;
-      categoryTotals[e.category].totalUsd += e.amountUsd;
-      categoryTotals[e.category].totalVes += e.amountVes;
-      grandTotalUsd += e.amountUsd;
-      grandTotalVes += e.amountVes;
+      categoryTotals[e.category].total += e.amount;
+      grandTotal += e.amount;
     }
   });
-
-  const grandTotal = currencyDisplay === 'USD' ? grandTotalUsd : grandTotalVes;
 
   // Build SVG Donut slices
   const radius = 64;
@@ -45,7 +36,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
   let accumulatedPercent = 0;
 
   const slices = ALL_CATEGORIES.map(cat => {
-    const total = currencyDisplay === 'USD' ? categoryTotals[cat].totalUsd : categoryTotals[cat].totalVes;
+    const total = categoryTotals[cat].total;
     const percent = grandTotal > 0 ? total / grandTotal : 0;
     const strokeDasharray = `${percent * circumference} ${circumference}`;
     const strokeDashoffset = -accumulatedPercent * circumference;
@@ -56,8 +47,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
       percent,
       strokeDasharray,
       strokeDashoffset,
-      totalUsd: categoryTotals[cat].totalUsd,
-      totalVes: categoryTotals[cat].totalVes,
+      total: categoryTotals[cat].total,
       count: categoryTotals[cat].count,
       config: CATEGORIES_CONFIG[cat],
     };
@@ -69,20 +59,20 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
         <div>
           <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <PieChartIcon className="w-4 h-4 text-slate-500" />
-            Desglose de Gastos por Categoría
+            Desglose de Gastos por Categoría (Bs.)
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Distribución proporcional del viaje ({expenses.length} comprobantes)
+            Distribución en Bolívares ({expenses.length} comprobantes)
           </p>
         </div>
-        <span className="text-xs font-semibold text-slate-600 font-mono-numbers">
-          {currencyDisplay === 'USD' ? '$' : 'Bs.'} {grandTotal.toFixed(2)}
+        <span className="text-xs font-bold text-slate-900 font-mono-numbers">
+          Total: Bs. {grandTotal.toFixed(2)}
         </span>
       </div>
 
       {grandTotal === 0 ? (
         <div className="py-12 text-center text-slate-400">
-          <p className="text-xs">No hay gastos registrados para este período.</p>
+          <p className="text-xs">No hay gastos registrados en Bolívares.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center pt-5">
@@ -137,10 +127,10 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
                 ) : (
                   <>
                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      TOTAL
+                      TOTAL VES
                     </span>
                     <span className="text-xs font-bold text-slate-900 font-mono-numbers">
-                      {currencyDisplay === 'USD' ? `$${grandTotalUsd.toFixed(0)}` : `Bs.${(grandTotalVes / 1000).toFixed(1)}k`}
+                      Bs. {(grandTotal / 1000).toFixed(1)}k
                     </span>
                   </>
                 )}
@@ -151,10 +141,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
           {/* Breakdown List */}
           <div className="md:col-span-7 space-y-2.5">
             {slices.map(slice => {
-              const Icon = slice.config.icon;
               const isHovered = hoveredCategory === slice.category;
-              const displayVal = currencyDisplay === 'USD' ? slice.totalUsd : slice.totalVes;
-              const currencySymbol = currencyDisplay === 'USD' ? '$' : 'Bs.';
 
               return (
                 <div
@@ -186,7 +173,7 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
 
                   <div className="text-right shrink-0 pl-2">
                     <span className="text-xs font-bold text-slate-900 font-mono-numbers block">
-                      {currencySymbol} {displayVal.toFixed(2)}
+                      Bs. {slice.total.toFixed(2)}
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono-numbers">
                       {(slice.percent * 100).toFixed(1)}%

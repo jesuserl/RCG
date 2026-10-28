@@ -2,24 +2,20 @@ import { Expense, TripRelation } from '../types';
 
 export function exportExpensesToCsv(
   expenses: Expense[],
-  project?: TripRelation,
+  relation?: TripRelation,
   filenamePrefix = 'liquidacion_viaticos'
 ): void {
   const headers = [
     'ID Gasto',
     'Fecha',
-    'Empleado',
-    'Proyecto/Viaje',
+    'Colaborador',
+    'Relación / Proyecto',
     'Categoría',
-    'Concepto/Descripción',
-    'Moneda Original',
-    'Monto Original',
-    'Tasa BCV Aplicada',
-    'Equivalente USD ($)',
-    'Equivalente Bs. (VES)',
+    'Concepto / Descripción',
+    'Monto (Bs. VES)',
     'Estado Aprobación',
     'Comprobante Adjunto',
-    'Observaciones Finanzas',
+    'Observaciones de Finanzas',
   ];
 
   const escapeCsv = (val: string | number | undefined | null) => {
@@ -39,36 +35,27 @@ export function exportExpensesToCsv(
       escapeCsv(exp.id),
       escapeCsv(exp.date),
       escapeCsv(exp.employeeName),
-      escapeCsv(exp.projectName),
+      escapeCsv(exp.projectName || (relation ? relation.title : '')),
       escapeCsv(exp.category),
       escapeCsv(exp.concept),
-      escapeCsv(exp.currency),
       escapeCsv(exp.amount.toFixed(2)),
-      escapeCsv(exp.bcvRate.toFixed(2)),
-      escapeCsv(exp.amountUsd.toFixed(2)),
-      escapeCsv(exp.amountVes.toFixed(2)),
       escapeCsv(statusMap[exp.status] || exp.status),
       escapeCsv(exp.receiptFileName || (exp.receiptUrl ? 'Adjunto' : 'Sin comprobante')),
       escapeCsv(exp.financeNotes || ''),
     ].join(',');
   });
 
-  // Calculate totals
-  const totalUsd = expenses.reduce((sum, e) => sum + e.amountUsd, 0);
-  const totalVes = expenses.reduce((sum, e) => sum + e.amountVes, 0);
+  // Calculate totals in Bolívares
+  const totalSpentVes = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   const summaryRow = [
-    escapeCsv('TOTALES LIQUIDADOS'),
+    escapeCsv('TOTALES LIQUIDADOS (VES)'),
     escapeCsv(''),
     escapeCsv(''),
     escapeCsv(''),
     escapeCsv(''),
-    escapeCsv(`${expenses.length} gastos registrados`),
-    escapeCsv(''),
-    escapeCsv(''),
-    escapeCsv(''),
-    escapeCsv(totalUsd.toFixed(2)),
-    escapeCsv(totalVes.toFixed(2)),
+    escapeCsv(`${expenses.length} comprobantes`),
+    escapeCsv(totalSpentVes.toFixed(2)),
     escapeCsv(''),
     escapeCsv(''),
     escapeCsv(''),

@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { TripRelation, Expense } from '../types';
 
 /**
- * Mapeo de TripRelation (TypeScript) a trip_relations (PostgreSQL)
+ * Mapeo de TripRelation (TypeScript) a trip_relations (PostgreSQL) en VES
  */
 function mapRelationToDb(rel: TripRelation) {
   return {
@@ -11,9 +11,7 @@ function mapRelationToDb(rel: TripRelation) {
     title: rel.title,
     destination: rel.destination,
     employee_name: rel.employeeName,
-    allocated_budget_usd: rel.allocatedBudgetUsd,
-    currency: rel.currency,
-    bcv_rate_at_creation: rel.bcvRateAtCreation,
+    allocated_budget_ves: rel.allocatedBudget,
     start_date: rel.startDate,
     end_date: rel.endDate,
     status: rel.status,
@@ -31,9 +29,7 @@ function mapRelationFromDb(row: any): TripRelation {
     title: row.title,
     destination: row.destination,
     employeeName: row.employee_name,
-    allocatedBudgetUsd: parseFloat(row.allocated_budget_usd) || 0,
-    currency: row.currency || 'USD',
-    bcvRateAtCreation: parseFloat(row.bcv_rate_at_creation) || 52.85,
+    allocatedBudget: parseFloat(row.allocated_budget_ves || row.allocated_budget_usd) || 0,
     startDate: row.start_date,
     endDate: row.end_date,
     status: row.status,
@@ -43,7 +39,7 @@ function mapRelationFromDb(row: any): TripRelation {
 }
 
 /**
- * Mapeo de Expense (TypeScript) a expenses (PostgreSQL)
+ * Mapeo de Expense (TypeScript) a expenses (PostgreSQL) en VES
  */
 function mapExpenseToDb(exp: Expense) {
   return {
@@ -53,10 +49,6 @@ function mapExpenseToDb(exp: Expense) {
     category: exp.category,
     concept: exp.concept,
     amount: exp.amount,
-    currency: exp.currency,
-    bcv_rate: exp.bcvRate,
-    amount_usd: exp.amountUsd,
-    amount_ves: exp.amountVes,
     employee_name: exp.employeeName,
     project_name: exp.projectName,
     receipt_url: exp.receiptUrl || null,
@@ -76,11 +68,7 @@ function mapExpenseFromDb(row: any): Expense {
     date: row.date,
     category: row.category,
     concept: row.concept,
-    amount: parseFloat(row.amount) || 0,
-    currency: row.currency,
-    bcvRate: parseFloat(row.bcv_rate) || 52.85,
-    amountUsd: parseFloat(row.amount_usd) || 0,
-    amountVes: parseFloat(row.amount_ves) || 0,
+    amount: parseFloat(row.amount || row.amount_ves) || 0,
     employeeName: row.employee_name,
     projectName: row.project_name,
     receiptUrl: row.receipt_url || undefined,

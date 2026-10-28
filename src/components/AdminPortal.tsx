@@ -10,18 +10,14 @@ import {
   XCircle, 
   Clock, 
   Eye, 
-  FileSpreadsheet, 
   Printer, 
   Search, 
-  ChevronRight, 
-  Coins, 
   Download,
-  AlertTriangle,
   Building,
   User,
   MapPin,
   Calendar,
-  Lock
+  Coins
 } from 'lucide-react';
 import { exportExpensesToCsv } from '../utils/exportCsv';
 
@@ -29,10 +25,7 @@ interface AdminPortalProps {
   relations: TripRelation[];
   expenses: Expense[];
   employees: EmployeeProfile[];
-  bcvRate: number;
-  currencyDisplay: 'USD' | 'VES';
   onOpenCreateRelation: () => void;
-  onOpenBcvModal: () => void;
   onApproveExpense: (id: string) => void;
   onRejectExpense: (id: string, notes: string) => void;
   onSettleRelation: (relationId: string) => void;
@@ -44,10 +37,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   relations,
   expenses,
   employees,
-  bcvRate,
-  currencyDisplay,
   onOpenCreateRelation,
-  onOpenBcvModal,
   onApproveExpense,
   onRejectExpense,
   onSettleRelation,
@@ -60,18 +50,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState('');
 
-  // Global totals
-  const totalAllocatedUsd = relations.reduce((sum, r) => sum + r.allocatedBudgetUsd, 0);
-  const totalAllocatedVes = totalAllocatedUsd * bcvRate;
-
-  const totalSpentUsd = expenses.reduce((sum, e) => sum + e.amountUsd, 0);
-  const totalSpentVes = expenses.reduce((sum, e) => sum + e.amountVes, 0);
+  // Global totals in Bolívares
+  const totalAllocated = relations.reduce((sum, r) => sum + r.allocatedBudget, 0);
+  const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   const pendingExpenses = expenses.filter(e => e.status === 'pending');
   const approvedExpenses = expenses.filter(e => e.status === 'approved');
-  const rejectedExpenses = expenses.filter(e => e.status === 'rejected');
-
-  const currencySymbol = currencyDisplay === 'USD' ? '$' : 'Bs.';
 
   // Filtered expenses for the audit view
   const filteredAuditExpenses = expenses.filter(exp => {
@@ -100,7 +84,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   };
 
   const handleExportAllCsv = () => {
-    exportExpensesToCsv(expenses, undefined, 'auditoria_general_viaticos');
+    exportExpensesToCsv(expenses, undefined, 'auditoria_general_viaticos_ves');
   };
 
   return (
@@ -111,7 +95,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Panel de Administración y Finanzas
+              Panel de Administración y Finanzas (Bs. VES)
             </span>
             <span className="text-xs text-slate-400 font-mono-numbers">
               {relations.length} Relaciones Activas
@@ -119,29 +103,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
 
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
-            Control de Asignaciones y Auditoría Contable
+            Asignaciones y Liquidación de Viáticos en Bolívares
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Crea relaciones con presupuesto asignado por empleado y valida comprobantes fiscales para liquidación
+            Crea fondos en Bolívares por colaborador y audita comprobantes fiscales para liquidación
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
-            onClick={onOpenBcvModal}
-            className="px-3 py-2 text-xs font-semibold text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200 transition-colors flex items-center gap-1.5 font-mono-numbers"
-          >
-            <Coins className="w-3.5 h-3.5 text-blue-600" />
-            <span>BCV: {bcvRate.toFixed(2)} Bs/$</span>
-          </button>
-
-          <button
             onClick={handleExportAllCsv}
             className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
-            title="Exportar archivo CSV con todos los gastos y relaciones"
+            title="Exportar archivo CSV con todos los gastos y relaciones en Bolívares"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Exportar CSV</span>
+            <span className="hidden sm:inline">Exportar CSV (Bs.)</span>
           </button>
 
           <button
@@ -149,19 +125,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
           >
             <FolderPlus className="w-4 h-4" />
-            <span>+ Cargar Nueva Relación</span>
+            <span>+ Cargar Relación (Bs.)</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Global Stat Strip */}
+      {/* KPI Global Stat Strip in Bolívares */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
             Total Presupuestos Asignados
           </span>
           <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono-numbers mt-1">
-            {currencySymbol} {(currencyDisplay === 'USD' ? totalAllocatedUsd : totalAllocatedVes).toFixed(2)}
+            Bs. {totalAllocated.toFixed(2)}
           </div>
           <span className="text-[10px] text-slate-400 font-mono-numbers mt-0.5 block">
             En {relations.length} viajes corporativos
@@ -173,7 +149,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             Total Rendido en Comprobantes
           </span>
           <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono-numbers mt-1">
-            {currencySymbol} {(currencyDisplay === 'USD' ? totalSpentUsd : totalSpentVes).toFixed(2)}
+            Bs. {totalSpent.toFixed(2)}
           </div>
           <span className="text-[10px] text-slate-400 font-mono-numbers mt-0.5 block">
             {expenses.length} facturas registradas
@@ -246,10 +222,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Relaciones Asignadas a Empleados
+                Relaciones Asignadas a Colaboradores (Bs.)
               </h3>
               <p className="text-xs text-slate-500">
-                El empleado sólo puede registrar gastos contra estas relaciones creadas
+                El colaborador únicamente puede justificar gastos contra estas relaciones
               </p>
             </div>
 
@@ -265,11 +241,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           <div className="divide-y divide-slate-100">
             {relations.map(rel => {
               const relExpenses = expenses.filter(e => e.relationId === rel.id);
-              const spentUsd = relExpenses.reduce((sum, e) => sum + e.amountUsd, 0);
-              const spentVes = spentUsd * bcvRate;
-              const remainingUsd = rel.allocatedBudgetUsd - spentUsd;
-              const progress = rel.allocatedBudgetUsd > 0 ? (spentUsd / rel.allocatedBudgetUsd) * 100 : 0;
-              const isOver = remainingUsd < 0;
+              const spent = relExpenses.reduce((sum, e) => sum + e.amount, 0);
+              const remaining = rel.allocatedBudget - spent;
+              const progress = rel.allocatedBudget > 0 ? (spent / rel.allocatedBudget) * 100 : 0;
+              const isOver = remaining < 0;
 
               return (
                 <div
@@ -326,17 +301,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </div>
 
-                  {/* Right side: Numbers + Status + Action buttons */}
+                  {/* Right side: Numbers in Bs. + Status + Actions */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                     <div className="text-left sm:text-right">
                       <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                        Asignado vs. Rendido
+                        Fondo Asignado
                       </span>
                       <div className="text-sm font-black text-slate-900 font-mono-numbers">
-                        $ {rel.allocatedBudgetUsd.toFixed(2)} USD
+                        Bs. {rel.allocatedBudget.toFixed(2)}
                       </div>
                       <div className="text-xs font-semibold text-slate-600 font-mono-numbers">
-                        Gastado: $ {spentUsd.toFixed(2)} ({relExpenses.length} facturas)
+                        Gastado: Bs. {spent.toFixed(2)} ({relExpenses.length} facturas)
                       </div>
                     </div>
 
@@ -491,8 +466,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           <span>Fecha: {expense.date}</span>
                           <span aria-hidden="true">·</span>
                           <span>Colaborador: <strong>{expense.employeeName}</strong></span>
-                          <span aria-hidden="true">·</span>
-                          <span className="font-mono-numbers">BCV: {expense.bcvRate.toFixed(2)}</span>
                         </div>
 
                         {expense.financeNotes && (
@@ -503,16 +476,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                     </div>
 
-                    {/* Amount + View Receipt + Finance Buttons */}
+                    {/* Amount in Bs. + View Receipt + Finance Buttons */}
                     <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       <div className="text-left sm:text-right">
                         <div className="text-base font-bold text-slate-900 font-mono-numbers">
-                          {expense.currency === 'USD' ? '$' : 'Bs.'} {expense.amount.toFixed(2)}
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-mono-numbers">
-                          {expense.currency === 'USD'
-                            ? `≈ Bs. ${expense.amountVes.toFixed(2)}`
-                            : `≈ $ ${expense.amountUsd.toFixed(2)} USD`}
+                          Bs. {expense.amount.toFixed(2)}
                         </div>
                       </div>
 
@@ -594,10 +562,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {/* TAB 3: ANALÍTICA Y DESGLOSE GLOBAL */}
       {activeTab === 'analytics' && (
         <div className="grid grid-cols-1 gap-6">
-          <CategoryBreakdown
-            expenses={expenses}
-            currencyDisplay={currencyDisplay}
-          />
+          <CategoryBreakdown expenses={expenses} />
         </div>
       )}
     </div>

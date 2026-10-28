@@ -3,7 +3,7 @@ import {
   X, 
   Upload, 
   Camera, 
-  DollarSign, 
+  Coins, 
   Sparkles, 
   Trash2, 
   Check, 
@@ -11,7 +11,7 @@ import {
   FileCheck,
   FolderOpen
 } from 'lucide-react';
-import { Expense, ExpenseCategory, ExpenseCurrency, TripRelation } from '../types';
+import { Expense, ExpenseCategory, TripRelation } from '../types';
 import { CATEGORIES_CONFIG, ALL_CATEGORIES } from '../utils/categories';
 import { generateSampleReceiptSvg } from '../utils/sampleReceipts';
 
@@ -21,7 +21,6 @@ interface ExpenseFormModalProps {
   onSave: (expense: Omit<Expense, 'id' | 'createdAt'>) => void;
   relations: TripRelation[];
   activeRelationId?: string;
-  bcvRate: number;
   currentEmployeeName: string;
 }
 
@@ -31,7 +30,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   onSave,
   relations,
   activeRelationId,
-  bcvRate,
   currentEmployeeName,
 }) => {
   const [relationId, setRelationId] = useState<string>(activeRelationId || relations[0]?.id || '');
@@ -39,7 +37,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const [category, setCategory] = useState<ExpenseCategory>('Alimentación');
   const [concept, setConcept] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [currency, setCurrency] = useState<ExpenseCurrency>('USD');
   const [receiptUrl, setReceiptUrl] = useState<string | undefined>(undefined);
   const [receiptFileName, setReceiptFileName] = useState<string | undefined>(undefined);
   const [error, setError] = useState('');
@@ -57,10 +54,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   if (!isOpen) return null;
 
   const numericAmount = parseFloat(amountStr) || 0;
-  
-  // Real-time currency conversions
-  const amountUsd = currency === 'USD' ? numericAmount : (numericAmount > 0 ? numericAmount / bcvRate : 0);
-  const amountVes = currency === 'VES' ? numericAmount : numericAmount * bcvRate;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,16 +76,16 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const handleGenerateSampleReceipt = () => {
     const randomTicketNum = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
     const storeMap: Record<ExpenseCategory, string> = {
-      Hospedaje: 'Hotel & Suites Corporativo',
-      Alimentación: 'Restaurante & Café Ejecutivo',
+      Hospedaje: 'Hotel & Posada Ejecutiva',
+      Alimentación: 'Restaurante & Panadería Criolla',
       Transporte: 'Transporte Terrestre Interurbano',
       Combustible: 'Estación de Servicios y Combustible',
-      Otros: 'Comercial & Suministros Generales',
+      Otros: 'Papelería y Suministros Comerciales',
     };
 
     const store = storeMap[category] || 'Establecimiento Comercial';
-    const sampleConcept = concept.trim() || `Gasto de ${category.toLowerCase()} durante comisión`;
-    const sampleAmount = numericAmount > 0 ? numericAmount : (currency === 'USD' ? 28.50 : 1500.00);
+    const sampleConcept = concept.trim() || `Gasto de ${category.toLowerCase()} durante viaje`;
+    const sampleAmount = numericAmount > 0 ? numericAmount : 1850.00;
 
     if (!amountStr) {
       setAmountStr(sampleAmount.toString());
@@ -103,13 +96,13 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       category,
       sampleConcept,
       sampleAmount,
-      currency,
+      'VES',
       date,
       randomTicketNum
     );
 
     setReceiptUrl(generatedSvgData);
-    setReceiptFileName(`recibo_${category.toLowerCase()}_${date}.svg`);
+    setReceiptFileName(`factura_${category.toLowerCase()}_${date}.svg`);
     setError('');
   };
 
@@ -120,13 +113,13 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       return;
     }
     if (numericAmount <= 0) {
-      setError('El monto del gasto debe ser mayor a 0');
+      setError('El monto del gasto debe ser mayor a Bs. 0');
       return;
     }
 
     const selectedRel = relations.find(r => r.id === relationId);
     if (!selectedRel) {
-      setError('Debes tener una relación de viáticos asignada para registrar este gasto');
+      setError('Debes seleccionar una relación de viáticos válida');
       return;
     }
 
@@ -136,10 +129,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       category,
       concept: concept.trim(),
       amount: numericAmount,
-      currency,
-      bcvRate,
-      amountUsd,
-      amountVes,
       employeeName: selectedRel.employeeName,
       projectName: selectedRel.title,
       receiptUrl,
@@ -156,8 +145,8 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Registrar Nuevo Gasto de Viático</h3>
-            <p className="text-xs text-slate-500">Ingresa los detalles del gasto y adjunta el comprobante</p>
+            <h3 className="text-base font-bold text-slate-900">Registrar Comprobante de Gasto (Bs.)</h3>
+            <p className="text-xs text-slate-500">Ingresa los datos de la factura en Bolívares y adjunta la foto</p>
           </div>
           <button
             onClick={onClose}
@@ -175,7 +164,46 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             </div>
           )}
 
-          {/* Row 1: Fecha y Moneda */}
+          {/* Relación de Viáticos Asignada */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+              <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
+              <span>Relación de Viáticos Asignada *</span>
+            </label>
+            {relations.length === 0 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                No tienes relaciones activas asignadas por Finanzas.
+              </div>
+            ) : relations.length === 1 ? (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center justify-between">
+                <div>
+                  <span className="font-mono-numbers font-bold text-blue-700">{relations[0].code}:</span>
+                  <span className="font-semibold text-slate-900 ml-1.5">{relations[0].title}</span>
+                  <span className="text-slate-500 block text-[11px] mt-0.5">
+                    Fondo Asignado: Bs. {relations[0].allocatedBudget.toFixed(2)}
+                  </span>
+                </div>
+                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded shrink-0">
+                  Asignada
+                </span>
+              </div>
+            ) : (
+              <select
+                value={relationId}
+                onChange={e => setRelationId(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:outline-none"
+                required
+              >
+                {relations.map(rel => (
+                  <option key={rel.id} value={rel.id}>
+                    {rel.code} — {rel.title} (Fondo: Bs. {rel.allocatedBudget.toFixed(2)})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Fecha y Monto en Bolívares */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -192,78 +220,30 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Moneda de Pago *
+                Monto en Bolívares (Bs. VES) *
               </label>
-              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setCurrency('USD')}
-                  className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    currency === 'USD'
-                      ? 'bg-white text-blue-700 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  USD ($)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrency('VES')}
-                  className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    currency === 'VES'
-                      ? 'bg-white text-blue-700 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Bs. BCV
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: Monto y Conversión en vivo */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-slate-700">
-                Monto del Comprobante *
-              </label>
-              <span className="text-[11px] text-slate-400 font-mono-numbers">
-                Tasa BCV: {bcvRate.toFixed(2)} Bs/$
-              </span>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                {currency === 'USD' ? '$' : 'Bs.'}
-              </span>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                value={amountStr}
-                onChange={e => {
-                  setAmountStr(e.target.value);
-                  setError('');
-                }}
-                className="w-full pl-12 pr-4 py-2.5 text-base font-mono-numbers font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:outline-none"
-                required
-              />
-            </div>
-
-            {/* Live conversion pill */}
-            {numericAmount > 0 && (
-              <div className="mt-1.5 px-3 py-1.5 bg-blue-50/60 rounded-lg text-xs font-mono-numbers text-blue-900 flex items-center justify-between">
-                <span>Contravalor calculado:</span>
-                <span className="font-bold">
-                  {currency === 'USD'
-                    ? `Bs. ${amountVes.toFixed(2)}`
-                    : `$ ${amountUsd.toFixed(2)} USD`}
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                  Bs.
                 </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={amountStr}
+                  onChange={e => {
+                    setAmountStr(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full pl-12 pr-4 py-2 text-sm font-mono-numbers font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:outline-none"
+                  required
+                />
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Row 3: Selector de Categorías */}
+          {/* Selector de Categorías */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Categoría de Gasto *
@@ -293,14 +273,14 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             </div>
           </div>
 
-          {/* Row 4: Concepto / Descripción */}
+          {/* Concepto / Descripción */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Concepto / Descripción del Gasto *
             </label>
             <input
               type="text"
-              placeholder="Ej. Almuerzo de trabajo con cliente en restaurante..."
+              placeholder="Ej. Almuerzo de trabajo con equipo técnico en restaurante..."
               value={concept}
               onChange={e => {
                 setConcept(e.target.value);
@@ -311,51 +291,12 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             />
           </div>
 
-          {/* Row 5: Relación de Viáticos Asignada */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-              <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
-              <span>Relación de Viáticos Asignada por la Empresa *</span>
-            </label>
-            {relations.length === 0 ? (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-                No tienes relaciones activas asignadas por el Administrador. Contacta a Finanzas.
-              </div>
-            ) : relations.length === 1 ? (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center justify-between">
-                <div>
-                  <span className="font-mono-numbers font-bold text-blue-700">{relations[0].code}:</span>
-                  <span className="font-semibold text-slate-900 ml-1.5">{relations[0].title}</span>
-                  <span className="text-slate-500 block text-[11px] mt-0.5">
-                    Colaborador: {relations[0].employeeName} · Presupuesto: ${relations[0].allocatedBudgetUsd.toFixed(2)} USD
-                  </span>
-                </div>
-                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded shrink-0">
-                  Asignada
-                </span>
-              </div>
-            ) : (
-              <select
-                value={relationId}
-                onChange={e => setRelationId(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:outline-none"
-                required
-              >
-                {relations.map(rel => (
-                  <option key={rel.id} value={rel.id}>
-                    {rel.code} — {rel.title} (${rel.allocatedBudgetUsd.toFixed(2)} USD) [{rel.employeeName}]
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Row 6: Adjunto de Comprobante / Foto */}
+          {/* Adjunto de Comprobante / Foto */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <Receipt className="w-4 h-4 text-slate-500" />
-                <span>Foto de Factura o Comprobante Fiscal</span>
+                <span>Foto de Factura o Ticket Fiscal (Bs.)</span>
               </label>
               
               <button
@@ -419,10 +360,10 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                   <Upload className="w-5 h-5" />
                 </div>
                 <p className="text-xs font-semibold text-slate-700">
-                  Toca para tomar foto con la cámara o subir archivo
+                  Toca para tomar foto de la factura con la cámara o subir archivo
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Formatos PNG, JPG, WebP o PDF hasta 8 MB
+                  Formatos PNG, JPG o PDF hasta 8 MB
                 </p>
               </div>
             )}
@@ -448,10 +389,10 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm hover:shadow flex items-center gap-2"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
-              Guardar Gasto
+              Guardar Gasto (Bs.)
             </button>
           </div>
         </form>

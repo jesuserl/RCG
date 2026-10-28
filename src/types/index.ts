@@ -5,8 +5,6 @@ export type ExpenseCategory =
   | 'Combustible'
   | 'Otros';
 
-export type ExpenseCurrency = 'USD' | 'VES';
-
 export type ExpenseStatus = 'pending' | 'approved' | 'rejected';
 
 export type RelationStatus = 'open' | 'submitted' | 'settled';
@@ -17,9 +15,7 @@ export interface TripRelation {
   title: string;              // Nombre del Viaje / Proyecto / Comisión
   destination: string;        // Ciudad o locación
   employeeName: string;       // Empleado responsable
-  allocatedBudgetUsd: number; // Monto asignado por el Administrador en USD
-  currency: ExpenseCurrency;  // Moneda base asignada
-  bcvRateAtCreation: number;  // Tasa BCV al momento de asignación
+  allocatedBudget: number;    // Monto asignado por el Administrador en Bolívares (Bs. VES)
   startDate: string;
   endDate: string;
   status: RelationStatus;     // 'open' (abierta para registrar) | 'submitted' (rendida a finanzas) | 'settled' (liquidada)
@@ -33,11 +29,7 @@ export interface Expense {
   date: string;               // YYYY-MM-DD
   category: ExpenseCategory;
   concept: string;            // Descripción
-  amount: number;             // Monto en moneda original
-  currency: ExpenseCurrency;  // 'USD' | 'VES'
-  bcvRate: number;            // Tasa oficial BCV usada
-  amountUsd: number;          // Monto normalizado en USD
-  amountVes: number;          // Monto normalizado en Bs
+  amount: number;             // Monto del gasto en Bolívares (Bs. VES)
   employeeName: string;
   projectName: string;        // Nombre de la relación/viaje
   receiptUrl?: string;        // Data URL Base64 o URL

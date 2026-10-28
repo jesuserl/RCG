@@ -6,12 +6,11 @@ export function generateSampleReceiptSvg(
   category: string,
   concept: string,
   amount: number,
-  currency: 'USD' | 'VES',
+  currency: string = 'VES',
   date: string,
   receiptNumber: string
 ): string {
-  const currencySymbol = currency === 'USD' ? '$' : 'Bs.';
-  const formattedAmount = `${currencySymbol} ${amount.toFixed(2)}`;
+  const formattedAmount = `Bs. ${amount.toFixed(2)}`;
   
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640" style="background:#ffffff; font-family: monospace;">
     <defs>
@@ -63,7 +62,7 @@ export function generateSampleReceiptSvg(
     <text x="444" y="415" text-anchor="end" font-size="12" fill="#0f172a">${formattedAmount}</text>
     
     <text x="36" y="440" font-size="12" fill="#64748b">I.V.A. (INCLUIDO):</text>
-    <text x="444" y="440" text-anchor="end" font-size="12" fill="#0f172a">${currencySymbol} ${(amount * 0.16).toFixed(2)}</text>
+    <text x="444" y="440" text-anchor="end" font-size="12" fill="#0f172a">Bs. ${(amount * 0.16).toFixed(2)}</text>
     
     <rect x="28" y="460" width="424" height="40" rx="4" fill="#f1f5f9"/>
     <text x="40" y="485" font-size="14" font-weight="bold" fill="#0f172a">TOTAL LIQUIDADO:</text>

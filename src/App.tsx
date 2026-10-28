@@ -5,8 +5,6 @@ import {
   saveRelations, 
   loadExpenses, 
   saveExpenses, 
-  loadBcvRate, 
-  saveBcvRate, 
   loadPortalMode, 
   savePortalMode,
   loadCurrentEmployee,
@@ -20,7 +18,6 @@ import { ExpenseFormModal } from './components/ExpenseFormModal';
 import { CreateRelationModal } from './components/CreateRelationModal';
 import { ReceiptViewerModal } from './components/ReceiptViewerModal';
 import { PrintReportModal } from './components/PrintReportModal';
-import { BcvRateModal } from './components/BcvRateModal';
 import { SupabaseSetupModal } from './components/SupabaseSetupModal';
 import { 
   fetchRelationsFromSupabase, 
@@ -31,22 +28,19 @@ import {
   updateRelationStatusInSupabase 
 } from './services/supabaseService';
 import { isSupabaseConfigured } from './lib/supabase';
-import { CheckCircle2, ShieldAlert, Lock, UserCheck, ShieldCheck, Briefcase } from 'lucide-react';
+import { CheckCircle2, Lock, ShieldCheck, Briefcase } from 'lucide-react';
 
 export default function App() {
   const [portalMode, setPortalMode] = useState<PortalMode>(() => loadPortalMode());
   const [relations, setRelations] = useState<TripRelation[]>(() => loadRelations());
   const [expenses, setExpenses] = useState<Expense[]>(() => loadExpenses());
-  const [bcvRate, setBcvRate] = useState<number>(() => loadBcvRate());
   const [employees] = useState<EmployeeProfile[]>(INITIAL_EMPLOYEES);
   const [currentEmployeeName, setCurrentEmployeeName] = useState<string>(() => loadCurrentEmployee());
-  const [currencyDisplay, setCurrencyDisplay] = useState<'USD' | 'VES'>('USD');
 
   // Modals state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [targetRelationIdForExpense, setTargetRelationIdForExpense] = useState<string | undefined>(undefined);
   const [isCreateRelationModalOpen, setIsCreateRelationModalOpen] = useState(false);
-  const [isBcvModalOpen, setIsBcvModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [printRelation, setPrintRelation] = useState<TripRelation | null>(null);
   const [viewingReceiptExpense, setViewingReceiptExpense] = useState<Expense | null>(null);
@@ -103,12 +97,6 @@ export default function App() {
     setCurrentEmployeeName(name);
     saveCurrentEmployee(name);
     showToast(`Cambiado a perfil de colaborador: ${name}`);
-  };
-
-  const handleSaveBcvRate = (newRate: number) => {
-    setBcvRate(newRate);
-    saveBcvRate(newRate);
-    showToast(`Tasa oficial BCV actualizada a ${newRate.toFixed(2)} Bs./USD`);
   };
 
   // Admin action: Create new trip relation
@@ -193,16 +181,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans pb-16">
-      {/* Top Bar with Brand, Independent Portal Indicator and Currency Toggle */}
+      {/* Top Bar with Brand, Independent Portal Indicator and Supabase Status */}
       <TopBar
         portalMode={portalMode}
         onChangePortalMode={handleChangePortalMode}
-        bcvRate={bcvRate}
-        onOpenBcvModal={() => setIsBcvModalOpen(true)}
-        currencyDisplay={currencyDisplay}
-        onToggleCurrencyDisplay={() =>
-          setCurrencyDisplay(prev => (prev === 'USD' ? 'VES' : 'USD'))
-        }
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         currentEmployeeName={currentEmployeeName}
       />
@@ -259,8 +241,6 @@ export default function App() {
             currentEmployee={currentEmployeeProfile}
             relations={relations}
             expenses={expenses}
-            bcvRate={bcvRate}
-            currencyDisplay={currencyDisplay}
             onOpenNewExpense={relationId => {
               setTargetRelationIdForExpense(relationId);
               setIsExpenseModalOpen(true);
@@ -276,10 +256,7 @@ export default function App() {
             relations={relations}
             expenses={expenses}
             employees={employees}
-            bcvRate={bcvRate}
-            currencyDisplay={currencyDisplay}
             onOpenCreateRelation={() => setIsCreateRelationModalOpen(true)}
-            onOpenBcvModal={() => setIsBcvModalOpen(true)}
             onApproveExpense={handleApproveExpense}
             onRejectExpense={handleRejectExpense}
             onSettleRelation={handleSettleRelation}
@@ -307,7 +284,6 @@ export default function App() {
         onSave={handleCreateExpense}
         relations={relationsForModal}
         activeRelationId={targetRelationIdForExpense}
-        bcvRate={bcvRate}
         currentEmployeeName={currentEmployeeName}
       />
 
@@ -316,7 +292,6 @@ export default function App() {
         onClose={() => setIsCreateRelationModalOpen(false)}
         onSave={handleCreateRelation}
         employees={employees}
-        bcvRate={bcvRate}
       />
 
       {viewingReceiptExpense && (
@@ -326,7 +301,6 @@ export default function App() {
           receiptUrl={viewingReceiptExpense.receiptUrl}
           concept={viewingReceiptExpense.concept}
           amount={viewingReceiptExpense.amount}
-          currency={viewingReceiptExpense.currency}
           date={viewingReceiptExpense.date}
           fileName={viewingReceiptExpense.receiptFileName}
         />
@@ -338,16 +312,8 @@ export default function App() {
           onClose={() => setPrintRelation(null)}
           relation={printRelation}
           expenses={expenses}
-          bcvRate={bcvRate}
         />
       )}
-
-      <BcvRateModal
-        isOpen={isBcvModalOpen}
-        onClose={() => setIsBcvModalOpen(false)}
-        currentRate={bcvRate}
-        onSaveRate={handleSaveBcvRate}
-      />
 
       <SupabaseSetupModal
         isOpen={isSupabaseModalOpen}

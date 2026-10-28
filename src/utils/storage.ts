@@ -1,13 +1,10 @@
 import { Expense, TripRelation, EmployeeProfile, PortalMode } from '../types';
 import { generateSampleReceiptSvg } from './sampleReceipts';
 
-const STORAGE_KEY_RELATIONS = 'viaticos_relations_v2';
-const STORAGE_KEY_EXPENSES = 'viaticos_expenses_v2';
-const STORAGE_KEY_BCV_RATE = 'viaticos_bcv_rate_v2';
-const STORAGE_KEY_PORTAL_MODE = 'viaticos_portal_mode_v2';
-const STORAGE_KEY_CURRENT_EMPLOYEE = 'viaticos_current_employee_v2';
-
-export const DEFAULT_BCV_RATE = 52.85;
+const STORAGE_KEY_RELATIONS = 'viaticos_relations_ves_v3';
+const STORAGE_KEY_EXPENSES = 'viaticos_expenses_ves_v3';
+const STORAGE_KEY_PORTAL_MODE = 'viaticos_portal_mode_ves_v3';
+const STORAGE_KEY_CURRENT_EMPLOYEE = 'viaticos_current_employee_ves_v3';
 
 export const INITIAL_EMPLOYEES: EmployeeProfile[] = [
   {
@@ -37,13 +34,11 @@ export const INITIAL_RELATIONS: TripRelation[] = [
     title: 'Auditoría Planta Valencia - Q4',
     destination: 'Valencia, Carabobo',
     employeeName: 'Jesús R. López',
-    allocatedBudgetUsd: 450.00,
-    currency: 'USD',
-    bcvRateAtCreation: 52.85,
+    allocatedBudget: 24000.00,
     startDate: '2026-10-24',
     endDate: '2026-10-29',
     status: 'open',
-    adminNotes: 'Viáticos autorizados para inspección técnica en planta. Hospedaje y traslado incluidos.',
+    adminNotes: 'Viáticos autorizados en Bolívares para inspección técnica en planta. Hospedaje y traslado incluidos.',
     createdAt: Date.now() - 1000 * 60 * 60 * 96,
   },
   {
@@ -52,9 +47,7 @@ export const INITIAL_RELATIONS: TripRelation[] = [
     title: 'Gira Comercial Clientes Barquisimeto',
     destination: 'Barquisimeto, Lara',
     employeeName: 'Mariana Rondón',
-    allocatedBudgetUsd: 320.00,
-    currency: 'USD',
-    bcvRateAtCreation: 52.85,
+    allocatedBudget: 17500.00,
     startDate: '2026-10-20',
     endDate: '2026-10-23',
     status: 'submitted',
@@ -67,9 +60,7 @@ export const INITIAL_RELATIONS: TripRelation[] = [
     title: 'Mantenimiento Preventivo Data Center',
     destination: 'Maracaibo, Zulia',
     employeeName: 'Carlos Mendoza',
-    allocatedBudgetUsd: 600.00,
-    currency: 'USD',
-    bcvRateAtCreation: 52.85,
+    allocatedBudget: 32000.00,
     startDate: '2026-10-10',
     endDate: '2026-10-14',
     status: 'settled',
@@ -85,14 +76,10 @@ export const INITIAL_EXPENSES: Expense[] = [
     date: '2026-10-24',
     category: 'Transporte',
     concept: 'Boleto de traslado terrestre ejecutivo Caracas - Valencia',
-    amount: 35.00,
-    currency: 'USD',
-    bcvRate: 52.85,
-    amountUsd: 35.00,
-    amountVes: 35.00 * 52.85,
+    amount: 1850.00,
     employeeName: 'Jesús R. López',
     projectName: 'Auditoría Planta Valencia - Q4',
-    receiptUrl: generateSampleReceiptSvg('Transportes Expresos Los Llanos C.A.', 'Transporte', 'Boleto ejecutivo Caracas-Valencia', 35.00, 'USD', '2026-10-24', 'F-004821'),
+    receiptUrl: generateSampleReceiptSvg('Transportes Expresos Los Llanos C.A.', 'Transporte', 'Boleto ejecutivo Caracas-Valencia', 1850.00, 'VES', '2026-10-24', 'F-004821'),
     receiptFileName: 'factura_transporte_ida.pdf',
     status: 'approved',
     financeNotes: 'Tarifa corporativa estándar aprobada.',
@@ -104,14 +91,10 @@ export const INITIAL_EXPENSES: Expense[] = [
     date: '2026-10-25',
     category: 'Hospedaje',
     concept: 'Hotel Guaparo Inn (2 noches con desayuno incluido)',
-    amount: 140.00,
-    currency: 'USD',
-    bcvRate: 52.85,
-    amountUsd: 140.00,
-    amountVes: 140.00 * 52.85,
+    amount: 7400.00,
     employeeName: 'Jesús R. López',
     projectName: 'Auditoría Planta Valencia - Q4',
-    receiptUrl: generateSampleReceiptSvg('Hotel Guaparo Inn C.A.', 'Hospedaje', 'Hospedaje 2 noches hab. ejecutiva', 140.00, 'USD', '2026-10-25', 'H-992314'),
+    receiptUrl: generateSampleReceiptSvg('Hotel Guaparo Inn C.A.', 'Hospedaje', 'Hospedaje 2 noches hab. ejecutiva', 7400.00, 'VES', '2026-10-25', 'H-992314'),
     receiptFileName: 'hotel_guaparo_factura.jpg',
     status: 'approved',
     financeNotes: 'Comprobante fiscal verificado.',
@@ -124,10 +107,6 @@ export const INITIAL_EXPENSES: Expense[] = [
     category: 'Alimentación',
     concept: 'Almuerzo de trabajo con equipo técnico de planta',
     amount: 1480.00,
-    currency: 'VES',
-    bcvRate: 52.85,
-    amountUsd: 1480.00 / 52.85,
-    amountVes: 1480.00,
     employeeName: 'Jesús R. López',
     projectName: 'Auditoría Planta Valencia - Q4',
     receiptUrl: generateSampleReceiptSvg('Restaurant El Mesón Criollo', 'Alimentación', 'Almuerzo ejecutivo 3 personas', 1480.00, 'VES', '2026-10-25', 'REC-77312'),
@@ -142,14 +121,10 @@ export const INITIAL_EXPENSES: Expense[] = [
     date: '2026-10-26',
     category: 'Combustible',
     concept: 'Carga de combustible para unidad vehicular en ruta',
-    amount: 25.00,
-    currency: 'USD',
-    bcvRate: 52.85,
-    amountUsd: 25.00,
-    amountVes: 25.00 * 52.85,
+    amount: 1320.00,
     employeeName: 'Jesús R. López',
     projectName: 'Auditoría Planta Valencia - Q4',
-    receiptUrl: generateSampleReceiptSvg('Estación de Servicio La Encrucijada', 'Combustible', '50 Lts Gasolina Premium', 25.00, 'USD', '2026-10-26', 'E-551029'),
+    receiptUrl: generateSampleReceiptSvg('Estación de Servicio La Encrucijada', 'Combustible', '50 Lts Gasolina', 1320.00, 'VES', '2026-10-26', 'E-551029'),
     receiptFileName: 'ticket_gasolina.png',
     status: 'approved',
     financeNotes: '',
@@ -161,14 +136,10 @@ export const INITIAL_EXPENSES: Expense[] = [
     date: '2026-10-21',
     category: 'Hospedaje',
     concept: 'Hotel Trinitarias Suites (Hospedaje comercial 2 noches)',
-    amount: 180.00,
-    currency: 'USD',
-    bcvRate: 52.85,
-    amountUsd: 180.00,
-    amountVes: 180.00 * 52.85,
+    amount: 9500.00,
     employeeName: 'Mariana Rondón',
     projectName: 'Gira Comercial Clientes Barquisimeto',
-    receiptUrl: generateSampleReceiptSvg('Trinitarias Suites C.A.', 'Hospedaje', 'Hospedaje Corporativo 2 noches', 180.00, 'USD', '2026-10-21', 'TS-44120'),
+    receiptUrl: generateSampleReceiptSvg('Trinitarias Suites C.A.', 'Hospedaje', 'Hospedaje Corporativo 2 noches', 9500.00, 'VES', '2026-10-21', 'TS-44120'),
     receiptFileName: 'hotel_trinitarias.jpg',
     status: 'approved',
     financeNotes: '',
@@ -180,17 +151,13 @@ export const INITIAL_EXPENSES: Expense[] = [
     date: '2026-10-22',
     category: 'Alimentación',
     concept: 'Cena con representantes de Distribuidora Centro',
-    amount: 45.00,
-    currency: 'USD',
-    bcvRate: 52.85,
-    amountUsd: 45.00,
-    amountVes: 45.00 * 52.85,
+    amount: 2400.00,
     employeeName: 'Mariana Rondón',
     projectName: 'Gira Comercial Clientes Barquisimeto',
-    receiptUrl: generateSampleReceiptSvg('Restaurant Tiuna Gourmet', 'Alimentación', 'Cena corporativa', 45.00, 'USD', '2026-10-22', 'TG-1002'),
+    receiptUrl: generateSampleReceiptSvg('Restaurant Tiuna Gourmet', 'Alimentación', 'Cena corporativa', 2400.00, 'VES', '2026-10-22', 'TG-1002'),
     receiptFileName: 'cena_tiuna.jpg',
     status: 'pending',
-    financeNotes: 'Pendiente revisar si incluye bebidas alcohólicas.',
+    financeNotes: 'Pendiente verificar RIF fiscal.',
     createdAt: Date.now() - 1000 * 60 * 60 * 95,
   },
 ];
@@ -239,30 +206,11 @@ export function saveExpenses(expenses: Expense[]): void {
   }
 }
 
-export function loadBcvRate(): number {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_BCV_RATE);
-    if (!raw) return DEFAULT_BCV_RATE;
-    const rate = parseFloat(raw);
-    return isNaN(rate) || rate <= 0 ? DEFAULT_BCV_RATE : rate;
-  } catch {
-    return DEFAULT_BCV_RATE;
-  }
-}
-
-export function saveBcvRate(rate: number): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_BCV_RATE, rate.toString());
-  } catch (e) {
-    console.error('Error guardando tasa BCV', e);
-  }
-}
-
 export function loadPortalMode(): PortalMode {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_PORTAL_MODE);
     if (raw === 'employee' || raw === 'admin') return raw;
-    return 'employee'; // Por defecto iniciamos con portal de empleado o con selector
+    return 'employee';
   } catch {
     return 'employee';
   }
