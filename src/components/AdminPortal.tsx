@@ -393,48 +393,6 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
 
   return (
     <div className="space-y-6">
-      {/* PERSISTENCE & SOURCE OF DATA STATUS BANNER */}
-      <div className="p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-emerald-50/90 border-emerald-200/90 text-emerald-950">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 bg-emerald-600 text-white shadow-xs">
-            <Cloud className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm">
-                Base de Datos Supabase (PostgreSQL) Conectada
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-200 text-emerald-900 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                Persistencia Activa
-              </span>
-            </div>
-            <p className="text-[11px] opacity-80 mt-0.5">
-              Proyecto: <strong>{extractProjectRef(supabaseUrlInput)}</strong> (https://qwivjixoziyliggczocf.supabase.co) · Todos los colaboradores, asignaciones de viáticos y comprobantes fiscales se guardan directamente en PostgreSQL.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onLoadFromSupabase}
-            className="px-3 py-1.5 rounded-xl font-bold transition-all text-xs flex items-center gap-1.5 border border-emerald-300 bg-white hover:bg-slate-50 text-slate-800 cursor-pointer"
-            title="Recargar todas las tablas desde Supabase"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-            <span>Recargar Supabase</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('database')}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Tablas &amp; SQL</span>
-          </button>
-        </div>
-      </div>
-
       {/* Admin Header with Badges & Primary Actions */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1149,6 +1107,44 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
       {/* TAB 5: BASE DE DATOS SUPABASE (POSTGRESQL & DIAGNÓSTICO EN VIVO) */}
       {activeTab === 'database' && (
         <div className="space-y-6">
+          {/* Notificación de Base de Datos Supabase en Verde (dentro del tab) */}
+          <div className="p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-emerald-50/90 border-emerald-200/90 text-emerald-950 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 bg-emerald-600 text-white shadow-xs">
+                <Cloud className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm">
+                    Base de Datos Supabase (PostgreSQL) Conectada
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-200 text-emerald-900 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    Persistencia Activa
+                  </span>
+                </div>
+                <p className="text-[11px] opacity-80 mt-0.5">
+                  Proyecto: <strong>{extractProjectRef(supabaseUrlInput)}</strong> (https://qwivjixoziyliggczocf.supabase.co) · Todos los colaboradores, asignaciones de viáticos y comprobantes fiscales se guardan directamente en PostgreSQL.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={async () => {
+                  await onLoadFromSupabase();
+                  await runDiagnostics();
+                }}
+                className="px-3.5 py-1.5 rounded-xl font-bold transition-all text-xs flex items-center gap-1.5 border border-emerald-300 bg-white hover:bg-slate-50 text-slate-800 cursor-pointer shadow-xs"
+                title="Recargar todas las tablas desde Supabase"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                <span>Recargar Supabase</span>
+              </button>
+            </div>
+          </div>
+
           {/* Notification inside tab: Empty database status */}
           {employees.length === 0 && relations.length === 0 && (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
