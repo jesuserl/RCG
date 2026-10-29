@@ -73,5 +73,5 @@ export interface SupabaseDiagnostics {
   checkedAt: number;
 }
 
-export const DEFAULT_ADMIN_TOKEN = 'ADMIN-2026';
+export const DEFAULT_ADMIN_TOKEN = 'admindc2026*';
 

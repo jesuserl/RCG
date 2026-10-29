@@ -60,9 +60,10 @@ interface AdminPortalProps {
   expenses: Expense[];
   employees: EmployeeProfile[];
   adminToken: string;
-  dataSourceMode: DataSourceMode;
-  onToggleDataSourceMode: (mode: DataSourceMode) => void;
-  onMigrateLocalToSupabase: () => Promise<{ success: boolean; message: string }>;
+  dataSourceMode?: DataSourceMode;
+  onToggleDataSourceMode?: (mode: DataSourceMode) => void;
+  onMigrateLocalToSupabase?: () => Promise<{ success: boolean; message: string }>;
+  onSeedInitialData?: () => Promise<{ success: boolean; message: string }>;
   onLoadFromSupabase: () => Promise<void>;
   onOpenCreateRelation: () => void;
   onApproveExpense: (id: string) => void;
@@ -75,6 +76,7 @@ interface AdminPortalProps {
   onDeleteEmployee: (employeeId: string) => void;
   onUpdateAdminToken: (newToken: string) => void;
   onSyncSupabase?: () => void;
+  onClearAllData?: () => Promise<{ success: boolean; message: string }>;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -82,9 +84,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   expenses,
   employees,
   adminToken,
-  dataSourceMode,
+  dataSourceMode = 'supabase',
   onToggleDataSourceMode,
   onMigrateLocalToSupabase,
+  onSeedInitialData,
   onLoadFromSupabase,
   onOpenCreateRelation,
   onApproveExpense,
@@ -97,6 +100,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onDeleteEmployee,
   onUpdateAdminToken,
   onSyncSupabase,
+  onClearAllData,
 }) => {
   const [activeTab, setActiveTab] = useState<'relations' | 'audit' | 'analytics' | 'collaborators' | 'database'>('relations');
   const [selectedRelationFilter, setSelectedRelationFilter] = useState<string>('all');
@@ -251,17 +255,46 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearResult, setClearResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleClearDatabase = async () => {
+    if (!window.confirm('¿Confirmas que deseas ELIMINAR TODOS LOS DATOS (empleados, viajes y gastos) y dejar únicamente el usuario Administrador con la clave admindc2026*? Esta acción vaciará Supabase y el almacenamiento local.')) {
+      return;
+    }
+
+    setIsClearing(true);
+    setClearResult(null);
+    try {
+      if (onClearAllData) {
+        const res = await onClearAllData();
+        setClearResult(res);
+      } else {
+        setClearResult({ success: false, message: 'Función de limpieza no configurada.' });
+      }
+      await runDiagnostics();
+    } catch (err: any) {
+      setClearResult({ success: false, message: err.message || 'Error al vaciar los datos' });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   const handleMigrate = async () => {
     setIsMigrating(true);
     setMigrationResult(null);
     try {
-      const res = await onMigrateLocalToSupabase();
+      const res = onSeedInitialData
+        ? await onSeedInitialData()
+        : onMigrateLocalToSupabase
+        ? await onMigrateLocalToSupabase()
+        : { success: false, message: 'Operación no disponible' };
       setMigrationResult(res);
       await runDiagnostics();
     } catch (err: any) {
       setMigrationResult({
         success: false,
-        message: err.message || 'Error en la migración',
+        message: err.message || 'Error en la inicialización de Supabase',
       });
     } finally {
       setIsMigrating(false);
@@ -331,47 +364,35 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
   return (
     <div className="space-y-6">
       {/* PERSISTENCE & SOURCE OF DATA STATUS BANNER */}
-      <div className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-        dataSourceMode === 'supabase'
-          ? 'bg-emerald-50/90 border-emerald-200/90 text-emerald-950'
-          : 'bg-slate-100 border-slate-300 text-slate-800'
-      }`}>
+      <div className="p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-emerald-50/90 border-emerald-200/90 text-emerald-950">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-            dataSourceMode === 'supabase' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-800 text-white'
-          }`}>
-            {dataSourceMode === 'supabase' ? <Cloud className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 bg-emerald-600 text-white shadow-xs">
+            <Cloud className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm">
-                Fuente de Datos Activa: {dataSourceMode === 'supabase' ? 'Nube Supabase (PostgreSQL)' : 'Almacenamiento Local (Navegador)'}
+                Base de Datos Supabase (PostgreSQL) Conectada
               </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                dataSourceMode === 'supabase' ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {dataSourceMode === 'supabase' ? 'Conectado a la Nube' : 'Modo Offline'}
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-200 text-emerald-900 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                Persistencia Activa
               </span>
             </div>
             <p className="text-[11px] opacity-80 mt-0.5">
-              {dataSourceMode === 'supabase'
-                ? `Proyecto: ${extractProjectRef(supabaseUrlInput)} (https://qwivjixoziyliggczocf.supabase.co) · Todos los registros se guardan y sincronizan en Supabase.`
-                : 'Los datos mostrados se leen desde la memoria local de tu navegador. Puedes cambiar a Supabase o migrar tus datos en cualquier momento.'}
+              Proyecto: <strong>{extractProjectRef(supabaseUrlInput)}</strong> (https://qwivjixoziyliggczocf.supabase.co) · Todos los colaboradores, asignaciones de viáticos y comprobantes fiscales se guardan directamente en PostgreSQL.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => onToggleDataSourceMode(dataSourceMode === 'supabase' ? 'local' : 'supabase')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs flex items-center gap-1.5 border cursor-pointer ${
-              dataSourceMode === 'supabase'
-                ? 'bg-white hover:bg-slate-50 text-slate-800 border-emerald-300'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent'
-            }`}
+            onClick={onLoadFromSupabase}
+            className="px-3 py-1.5 rounded-xl font-bold transition-all text-xs flex items-center gap-1.5 border border-emerald-300 bg-white hover:bg-slate-50 text-slate-800 cursor-pointer"
+            title="Recargar todas las tablas desde Supabase"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Cambiar a {dataSourceMode === 'supabase' ? 'Modo Local' : 'Nube Supabase'}</span>
+            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+            <span>Recargar Supabase</span>
           </button>
 
           <button
@@ -379,7 +400,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
           >
             <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Gestionar BD</span>
+            <span>Tablas &amp; SQL</span>
           </button>
         </div>
       </div>
@@ -395,10 +416,9 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
             <span className="text-xs text-slate-400 font-mono-numbers">
               {relations.length} Relaciones · {employees.length} Colaboradores
             </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-              dataSourceMode === 'supabase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
-            }`}>
-              {dataSourceMode === 'supabase' ? '☁️ Supabase Cloud' : '💾 Local Storage'}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+              <Cloud className="w-3 h-3 text-emerald-600" />
+              <span>Supabase PostgreSQL</span>
             </span>
           </div>
 
@@ -1052,7 +1072,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                   <input
                     type="text"
                     value={newAdminTokenInput}
-                    onChange={e => setNewAdminTokenInput(e.target.value.toUpperCase())}
+                    onChange={e => setNewAdminTokenInput(e.target.value)}
                     className="px-3 py-1.5 text-xs font-mono font-bold bg-slate-800 border border-emerald-500 text-white rounded-xl focus:outline-none"
                   />
                   <button
@@ -1132,7 +1152,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                   {diagnostics ? diagnostics.employeesCount : '—'} <span className="text-xs font-normal text-slate-500">en Supabase</span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
-                  Local en navegador: <strong>{employees.length}</strong>
+                  Registros cargados: <strong>{employees.length}</strong>
                 </div>
               </div>
 
@@ -1147,7 +1167,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                   {diagnostics ? diagnostics.relationsCount : '—'} <span className="text-xs font-normal text-slate-500">en Supabase</span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
-                  Local en navegador: <strong>{relations.length}</strong>
+                  Registros cargados: <strong>{relations.length}</strong>
                 </div>
               </div>
 
@@ -1162,7 +1182,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                   {diagnostics ? diagnostics.expensesCount : '—'} <span className="text-xs font-normal text-slate-500">en Supabase</span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
-                  Local en navegador: <strong>{expenses.length}</strong>
+                  Registros cargados: <strong>{expenses.length}</strong>
                 </div>
               </div>
             </div>
@@ -1173,10 +1193,10 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                 <div>
                   <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                     <Layers className="w-4 h-4 text-blue-600" />
-                    <span>Sincronización y Migración Directa</span>
+                    <span>Inicialización y Persistencia en Supabase</span>
                   </h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Sube todos los datos locales existentes a las tablas de tu base de datos Supabase, o descarga los de la nube
+                    Inserta o actualiza directamente las tablas PostgreSQL en Supabase con los datos base de viáticos en Bolívares (VES), o recarga los registros vigentes.
                   </p>
                 </div>
 
@@ -1187,7 +1207,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <UploadCloud className={`w-4 h-4 ${isMigrating ? 'animate-bounce' : ''}`} />
-                    <span>{isMigrating ? 'Subiendo a Supabase...' : 'Subir Datos Locales a Supabase'}</span>
+                    <span>{isMigrating ? 'Sembrando en Supabase...' : 'Sembrar / Inicializar Datos en Supabase'}</span>
                   </button>
 
                   <button
@@ -1198,7 +1218,7 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                     className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
                   >
                     <DownloadCloud className="w-4 h-4 text-blue-600" />
-                    <span>Cargar Datos desde Supabase</span>
+                    <span>Recargar desde Supabase</span>
                   </button>
                 </div>
               </div>
@@ -1215,6 +1235,46 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   )}
                   <span>{migrationResult.message}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Danger Zone: Limpieza de Base de Datos */}
+            <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    <span>Limpieza Total: Dejar Solo Administrador</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    Elimina todos los datos de las tablas de Supabase (colaboradores, relaciones y gastos). Deja únicamente activo al usuario administrador con la clave <code className="bg-rose-100 text-rose-900 px-1.5 py-0.5 rounded font-mono font-bold">admindc2026*</code>.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleClearDatabase}
+                  disabled={isClearing}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  <Trash2 className={`w-4 h-4 ${isClearing ? 'animate-spin' : ''}`} />
+                  <span>{isClearing ? 'Eliminando registros...' : 'Limpiar y Vaciar Todas las Tablas'}</span>
+                </button>
+              </div>
+
+              {clearResult && (
+                <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  clearResult.success
+                    ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                    : 'bg-rose-100 text-rose-950 border border-rose-300'
+                }`}>
+                  {clearResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  )}
+                  <span>{clearResult.message}</span>
                 </div>
               )}
             </div>

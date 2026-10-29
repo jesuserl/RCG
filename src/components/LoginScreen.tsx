@@ -11,7 +11,10 @@ import {
   EyeOff,
   CheckCircle2,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Cloud,
+  Database,
+  RefreshCw
 } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -19,6 +22,9 @@ interface LoginScreenProps {
   adminToken: string;
   onLoginEmployee: (employee: EmployeeProfile) => void;
   onLoginAdmin: () => void;
+  onSeedDatabase?: () => Promise<any>;
+  isSeeding?: boolean;
+  projectRef?: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -26,14 +32,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   adminToken,
   onLoginEmployee,
   onLoginAdmin,
+  onSeedDatabase,
+  isSeeding = false,
+  projectRef = 'qwivjixoziyliggczocf',
 }) => {
-  const [activeTab, setActiveTab] = useState<'employee' | 'admin'>('employee');
+  const [activeTab, setActiveTab] = useState<'employee' | 'admin'>(() => (employees.length === 0 ? 'admin' : 'employee'));
 
   // Employee login state
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(employees[0]?.id || '');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(() => employees[0]?.id || '');
   const [employeeTokenInput, setEmployeeTokenInput] = useState<string>('');
   const [showEmployeeToken, setShowEmployeeToken] = useState<boolean>(false);
   const [employeeError, setEmployeeError] = useState<string | null>(null);
+
+  // Sync active tab and selected employee when employees list changes
+  React.useEffect(() => {
+    if (employees.length === 0) {
+      setActiveTab('admin');
+    } else if (!employees.some(e => e.id === selectedEmployeeId)) {
+      setSelectedEmployeeId(employees[0].id);
+    }
+  }, [employees, selectedEmployeeId]);
 
   // Admin login state
   const [adminTokenInput, setAdminTokenInput] = useState<string>('');
@@ -110,9 +128,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           Sistema de Control y Rendición de Viáticos en Bolívares (Bs. VES)
         </p>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-full text-[11px] font-semibold text-slate-300 mt-3 font-mono-numbers">
-          <Coins className="w-3.5 h-3.5 text-blue-400" />
-          <span>Moneda Operativa Oficial: Bs. VES</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-3 font-mono-numbers">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 border border-slate-700/80 rounded-full text-[11px] font-semibold text-slate-300">
+            <Coins className="w-3.5 h-3.5 text-blue-400" />
+            <span>Moneda: Bs. VES</span>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-950/60 border border-emerald-800/60 rounded-full text-[11px] font-semibold text-emerald-300">
+            <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Supabase DB ({projectRef})</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
         </div>
       </header>
 
@@ -160,27 +186,57 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
                 Selecciona tu Nombre:
               </label>
-              <div className="relative">
-                <select
-                  value={selectedEmployeeId}
-                  onChange={e => {
-                    setSelectedEmployeeId(e.target.value);
-                    setEmployeeTokenInput('');
-                    setEmployeeError(null);
-                  }}
-                  className="w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
-                >
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} — {emp.department}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {selectedEmployee && (
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Cargo: <span className="text-slate-300">{selectedEmployee.position}</span>
-                </p>
+              {employees.length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700 text-center space-y-3">
+                  <p className="text-xs text-slate-300">
+                    Aún no hay colaboradores en la tabla <code className="text-emerald-400">employees</code> de Supabase.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {onSeedDatabase && (
+                      <button
+                        type="button"
+                        onClick={onSeedDatabase}
+                        disabled={isSeeding}
+                        className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
+                        <span>{isSeeding ? 'Inicializando...' : 'Inicializar Datos Base en Supabase'}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('admin')}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-bold"
+                    >
+                      Ingresar como Administrador &rarr;
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <select
+                      value={selectedEmployeeId}
+                      onChange={e => {
+                        setSelectedEmployeeId(e.target.value);
+                        setEmployeeTokenInput('');
+                        setEmployeeError(null);
+                      }}
+                      className="w-full px-3.5 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+                    >
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name} — {emp.department}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedEmployee && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Cargo: <span className="text-slate-300">{selectedEmployee.position}</span>
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -264,7 +320,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Token Maestro de Finanzas:
+                  Clave de Acceso Administrador:
                 </label>
                 <button
                   type="button"
@@ -272,7 +328,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <Sparkles className="w-3 h-3" />
-                  <span>Auto-rellenar demo ({adminToken || DEFAULT_ADMIN_TOKEN})</span>
+                  <span>Auto-rellenar ({adminToken || DEFAULT_ADMIN_TOKEN})</span>
                 </button>
               </div>
               <div className="relative">
@@ -281,7 +337,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
                 <input
                   type={showAdminToken ? 'text' : 'password'}
-                  placeholder="Ej. ADMIN-2026"
+                  placeholder="Ej. admindc2026*"
                   value={adminTokenInput}
                   onChange={e => {
                     setAdminTokenInput(e.target.value);

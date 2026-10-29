@@ -1,24 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   TripRelation, 
   Expense, 
   EmployeeProfile, 
   AuthSession, 
-  DEFAULT_ADMIN_TOKEN,
-  DataSourceMode 
+  DEFAULT_ADMIN_TOKEN 
 } from './types';
 import { 
-  loadRelations, 
-  saveRelations, 
-  loadExpenses, 
-  saveExpenses, 
-  loadEmployees,
-  saveEmployees,
-  loadAdminToken,
-  saveAdminToken,
-  loadSession,
-  saveSession,
-  clearSession
+  loadAdminToken, 
+  saveAdminToken, 
+  loadSession, 
+  saveSession, 
+  clearSession,
+  clearAllStorage 
 } from './utils/storage';
 import { TopBar } from './components/TopBar';
 import { EmployeePortal } from './components/EmployeePortal';
@@ -38,25 +32,27 @@ import {
   deleteEmployeeFromSupabase,
   updateExpenseStatusInSupabase, 
   updateRelationStatusInSupabase,
-  syncLocalDataToSupabase
+  seedInitialDataToSupabase,
+  clearAllSupabaseData
 } from './services/supabaseService';
 import { 
   isSupabaseConfigured, 
-  getStoredDataSourceMode, 
-  saveStoredDataSourceMode,
   getSupabaseCredentials 
 } from './lib/supabase';
-import { CheckCircle2, ShieldCheck, Briefcase } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Briefcase, RefreshCw, AlertCircle, Cloud } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
-  const [employees, setEmployees] = useState<EmployeeProfile[]>(() => loadEmployees());
+  const [employees, setEmployees] = useState<EmployeeProfile[]>([]);
   const [adminToken, setAdminToken] = useState<string>(() => loadAdminToken());
-  const [relations, setRelations] = useState<TripRelation[]>(() => loadRelations());
-  const [expenses, setExpenses] = useState<Expense[]>(() => loadExpenses());
+  const [relations, setRelations] = useState<TripRelation[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
-  // Data Source Mode: 'supabase' (Cloud DB) or 'local' (Browser Storage)
-  const [dataSourceMode, setDataSourceMode] = useState<DataSourceMode>(() => getStoredDataSourceMode());
+  // Loading and sync states
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isSeeding, setIsSeeding] = useState<boolean>(false);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   // Modals state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -75,47 +71,111 @@ export default function App() {
     }, 4000);
   };
 
-  // Sync from Supabase on mount if configured and mode is supabase
-  useEffect(() => {
-    async function syncFromSupabase() {
-      if (isSupabaseConfigured()) {
-        try {
-          const [cloudEmps, cloudRels, cloudExps] = await Promise.all([
-            fetchEmployeesFromSupabase(),
-            fetchRelationsFromSupabase(),
-            fetchExpensesFromSupabase(),
-          ]);
-
-          // If Supabase has data, hydrate state with cloud data
-          if (cloudEmps && cloudEmps.length > 0) {
-            setEmployees(cloudEmps);
-          }
-          if (cloudRels && cloudRels.length > 0) {
-            setRelations(cloudRels);
-          }
-          if (cloudExps && cloudExps.length > 0) {
-            setExpenses(cloudExps);
-          }
-        } catch (e) {
-          console.warn('No se pudo sincronizar automáticamente con Supabase:', e);
-        }
-      }
+  // Pure Supabase Data Fetcher
+  const loadDataFromSupabase = useCallback(async (isInitial = false) => {
+    if (isInitial) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
     }
-    syncFromSupabase();
+    setDbError(null);
+
+    try {
+      if (!isSupabaseConfigured()) {
+        setDbError('Supabase no está configurado. Por favor verifica las credenciales en .env');
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      const [cloudEmps, cloudRels, cloudExps] = await Promise.all([
+        fetchEmployeesFromSupabase(),
+        fetchRelationsFromSupabase(),
+        fetchExpensesFromSupabase(),
+      ]);
+
+      if (cloudEmps === null && cloudRels === null) {
+        setDbError('No se pudo conectar a las tablas de Supabase. Asegúrate de haber ejecutado el script SQL.');
+      } else {
+        setEmployees(cloudEmps || []);
+        setRelations(cloudRels || []);
+        setExpenses(cloudExps || []);
+      }
+    } catch (err: any) {
+      console.error('Error cargando datos desde Supabase:', err);
+      setDbError(err.message || 'Error de conexión con Supabase');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
 
-  // Always keep local storage in sync as local cache / fallback
+  // Hydrate strictly from Supabase on mount
   useEffect(() => {
-    saveEmployees(employees);
-  }, [employees]);
+    loadDataFromSupabase(true);
+  }, [loadDataFromSupabase]);
 
-  useEffect(() => {
-    saveRelations(relations);
-  }, [relations]);
+  // One-Click Seed to Supabase (Seeds PostgreSQL database directly)
+  const handleSeedSupabaseData = async (): Promise<{ success: boolean; message: string }> => {
+    setIsSeeding(true);
+    try {
+      showToast('Inicializando tablas en Supabase con datos base en Bolívares (VES)...');
+      const res = await seedInitialDataToSupabase();
+      if (res.success) {
+        await loadDataFromSupabase(false);
+        const msg = `¡Éxito! Se crearon ${res.employeesSaved} colaboradores, ${res.relationsSaved} relaciones y ${res.expensesSaved} gastos directamente en Supabase.`;
+        showToast(msg);
+        return { success: true, message: msg };
+      } else {
+        const errorMsg = `Error al sembrar en Supabase: ${res.error}. ¿Ejecutaste el script SQL?`;
+        showToast(errorMsg);
+        return { success: false, message: errorMsg };
+      }
+    } catch (err: any) {
+      const errorMsg = `Fallo al inicializar: ${err.message}`;
+      showToast(errorMsg);
+      return { success: false, message: errorMsg };
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
+  // Ensure stored admin token is migrated if user had legacy token
   useEffect(() => {
-    saveExpenses(expenses);
-  }, [expenses]);
+    const stored = loadAdminToken();
+    if (!stored || stored === 'ADMIN-2026') {
+      saveAdminToken(DEFAULT_ADMIN_TOKEN);
+      setAdminToken(DEFAULT_ADMIN_TOKEN);
+    }
+  }, []);
+
+  // Wipe all tables in Supabase and localStorage, leaving only Admin with admindc2026*
+  const handleClearAllData = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      showToast('Eliminando todos los registros en Supabase (PostgreSQL)...');
+      const res = await clearAllSupabaseData();
+      clearAllStorage();
+      setEmployees([]);
+      setRelations([]);
+      setExpenses([]);
+      setAdminToken(DEFAULT_ADMIN_TOKEN);
+      saveAdminToken(DEFAULT_ADMIN_TOKEN);
+
+      if (res.success) {
+        const msg = '¡Tablas vaciadas con éxito! Todos los datos han sido eliminados. Solo queda el Administrador con la clave admindc2026*.';
+        showToast(msg);
+        return { success: true, message: msg };
+      } else {
+        const msg = `Almacenamiento local limpiado. Supabase reportó: ${res.error}`;
+        showToast(msg);
+        return { success: false, message: msg };
+      }
+    } catch (err: any) {
+      const msg = `Error al vaciar datos: ${err.message}`;
+      showToast(msg);
+      return { success: false, message: msg };
+    }
+  };
 
   // Auth actions
   const handleLoginEmployee = (emp: EmployeeProfile) => {
@@ -134,7 +194,7 @@ export default function App() {
   const handleLoginAdmin = () => {
     const newSession: AuthSession = {
       role: 'admin',
-      token: adminToken,
+      token: adminToken || DEFAULT_ADMIN_TOKEN,
       loginTime: Date.now(),
     };
     setSession(newSession);
@@ -148,110 +208,45 @@ export default function App() {
     showToast('Sesión cerrada correctamente.');
   };
 
-  // Toggle between Supabase and Local Mode
-  const handleToggleDataSourceMode = async (newMode: DataSourceMode) => {
-    setDataSourceMode(newMode);
-    saveStoredDataSourceMode(newMode);
-
-    if (newMode === 'supabase') {
-      showToast('Cambiando a Nube Supabase (PostgreSQL)...');
-      await handleLoadFromSupabase();
-    } else {
-      setEmployees(loadEmployees());
-      setRelations(loadRelations());
-      setExpenses(loadExpenses());
-      showToast('Cambiado a Almacenamiento Local (Navegador).');
-    }
-  };
-
-  // One-Click Migration: Push all local records to Supabase
-  const handleMigrateLocalToSupabase = async (): Promise<{ success: boolean; message: string }> => {
-    const res = await syncLocalDataToSupabase(employees, relations, expenses);
-    if (res.success) {
-      setDataSourceMode('supabase');
-      saveStoredDataSourceMode('supabase');
-      showToast(`¡Sincronizado! Se subieron ${res.employeesSaved} colaboradores, ${res.relationsSaved} relaciones y ${res.expensesSaved} gastos.`);
-      return {
-        success: true,
-        message: `¡Éxito! Se migraron ${res.employeesSaved} colaboradores, ${res.relationsSaved} relaciones y ${res.expensesSaved} gastos a tu base de datos Supabase.`,
-      };
-    } else {
-      showToast(`Error al subir datos: ${res.error}`);
-      return {
-        success: false,
-        message: `Error al subir: ${res.error}`,
-      };
-    }
-  };
-
-  // One-Click Load: Pull all records from Supabase
-  const handleLoadFromSupabase = async () => {
-    try {
-      const [cloudEmps, cloudRels, cloudExps] = await Promise.all([
-        fetchEmployeesFromSupabase(),
-        fetchRelationsFromSupabase(),
-        fetchExpensesFromSupabase(),
-      ]);
-
-      let count = 0;
-      if (cloudEmps && cloudEmps.length > 0) {
-        setEmployees(cloudEmps);
-        count += cloudEmps.length;
-      }
-      if (cloudRels && cloudRels.length > 0) {
-        setRelations(cloudRels);
-        count += cloudRels.length;
-      }
-      if (cloudExps && cloudExps.length > 0) {
-        setExpenses(cloudExps);
-        count += cloudExps.length;
-      }
-
-      if (count > 0) {
-        showToast(`Cargados desde Supabase: ${cloudRels?.length || 0} relaciones, ${cloudExps?.length || 0} gastos.`);
-      } else {
-        showToast('Supabase conectado. Las tablas están vacías; puedes presionar "Subir Datos Locales".');
-      }
-    } catch (err: any) {
-      showToast(`Fallo al cargar de Supabase: ${err.message || 'error'}`);
-    }
-  };
-
-  // Collaborator management
-  const handleCreateEmployee = (newEmpData: Omit<EmployeeProfile, 'id'>) => {
+  // Collaborator management (Strict Supabase persistence)
+  const handleCreateEmployee = async (newEmpData: Omit<EmployeeProfile, 'id'>) => {
     const newEmp: EmployeeProfile = {
       ...newEmpData,
       id: `emp-${Date.now()}`,
     };
     setEmployees(prev => [...prev, newEmp]);
-    if (isSupabaseConfigured()) {
-      upsertEmployeeInSupabase(newEmp);
+    
+    const res = await upsertEmployeeInSupabase(newEmp);
+    if (res.success) {
+      showToast(`Colaborador ${newEmp.name} creado y persistido en Supabase.`);
+    } else {
+      showToast(`Error guardando en Supabase: ${res.error}`);
     }
-    showToast(`Colaborador ${newEmp.name} creado con token ${newEmp.token}`);
   };
 
-  const handleUpdateEmployeeToken = (employeeId: string, newToken: string) => {
-    setEmployees(prev =>
-      prev.map(e => {
-        if (e.id === employeeId) {
-          const updated = { ...e, token: newToken };
-          if (isSupabaseConfigured()) {
-            upsertEmployeeInSupabase(updated);
-          }
-          return updated;
-        }
-        return e;
-      })
-    );
-    showToast('Token de acceso actualizado.');
+  const handleUpdateEmployeeToken = async (employeeId: string, newToken: string) => {
+    const emp = employees.find(e => e.id === employeeId);
+    if (!emp) return;
+
+    const updated = { ...emp, token: newToken };
+    setEmployees(prev => prev.map(e => (e.id === employeeId ? updated : e)));
+
+    const res = await upsertEmployeeInSupabase(updated);
+    if (res.success) {
+      showToast(`Token de ${updated.name} actualizado en Supabase.`);
+    } else {
+      showToast(`Error actualizando token en Supabase: ${res.error}`);
+    }
   };
 
-  const handleDeleteEmployee = (employeeId: string) => {
+  const handleDeleteEmployee = async (employeeId: string) => {
     setEmployees(prev => prev.filter(e => e.id !== employeeId));
-    if (isSupabaseConfigured()) {
-      deleteEmployeeFromSupabase(employeeId);
+    const res = await deleteEmployeeFromSupabase(employeeId);
+    if (res.success) {
+      showToast('Colaborador eliminado de Supabase.');
+    } else {
+      showToast(`Error eliminando en Supabase: ${res.error}`);
     }
-    showToast('Colaborador eliminado.');
   };
 
   const handleUpdateAdminToken = (newToken: string) => {
@@ -260,8 +255,8 @@ export default function App() {
     showToast('Token de administrador actualizado con éxito.');
   };
 
-  // Admin action: Create new trip relation
-  const handleCreateRelation = (newRelData: Omit<TripRelation, 'id' | 'createdAt'>) => {
+  // Admin action: Create new trip relation (Strict Supabase persistence)
+  const handleCreateRelation = async (newRelData: Omit<TripRelation, 'id' | 'createdAt'>) => {
     const newRelation: TripRelation = {
       ...newRelData,
       id: `rel-${Date.now()}`,
@@ -269,14 +264,16 @@ export default function App() {
     };
 
     setRelations(prev => [newRelation, ...prev]);
-    if (isSupabaseConfigured()) {
-      insertRelationInSupabase(newRelation);
+    const res = await insertRelationInSupabase(newRelation);
+    if (res.success) {
+      showToast(`Relación ${newRelation.code} creada y guardada en Supabase.`);
+    } else {
+      showToast(`Error guardando relación en Supabase: ${res.error}`);
     }
-    showToast(`Relación ${newRelation.code} creada y asignada a ${newRelation.employeeName} con éxito.`);
   };
 
-  // Employee action: Register expense linked to relation
-  const handleCreateExpense = (newExpData: Omit<Expense, 'id' | 'createdAt'>) => {
+  // Employee action: Register expense linked to relation (Strict Supabase persistence)
+  const handleCreateExpense = async (newExpData: Omit<Expense, 'id' | 'createdAt'>) => {
     const newExpense: Expense = {
       ...newExpData,
       id: `exp-${Date.now()}`,
@@ -284,36 +281,42 @@ export default function App() {
     };
 
     setExpenses(prev => [newExpense, ...prev]);
-    if (isSupabaseConfigured()) {
-      insertExpenseInSupabase(newExpense);
+    const res = await insertExpenseInSupabase(newExpense);
+    if (res.success) {
+      showToast('¡Comprobante de gasto guardado persistentemente en Supabase!');
+    } else {
+      showToast(`Error guardando comprobante en Supabase: ${res.error}`);
     }
-    showToast('¡Comprobante de gasto cargado a la relación con éxito!');
   };
 
   // Employee action: Submit relation to finance
-  const handleSubmitRelation = (relationId: string) => {
+  const handleSubmitRelation = async (relationId: string) => {
     setRelations(prev =>
       prev.map(r => (r.id === relationId ? { ...r, status: 'submitted' as const } : r))
     );
-    if (isSupabaseConfigured()) {
-      updateRelationStatusInSupabase(relationId, 'submitted');
+    const res = await updateRelationStatusInSupabase(relationId, 'submitted');
+    if (res.success) {
+      showToast('¡Relación enviada a Finanzas y actualizada en Supabase!');
+    } else {
+      showToast(`Error actualizando relación en Supabase: ${res.error}`);
     }
-    showToast('¡Relación enviada a Finanzas para revisión y auditoría!');
   };
 
   // Admin action: Approve expense
-  const handleApproveExpense = (id: string) => {
+  const handleApproveExpense = async (id: string) => {
     setExpenses(prev =>
       prev.map(e => (e.id === id ? { ...e, status: 'approved' as const } : e))
     );
-    if (isSupabaseConfigured()) {
-      updateExpenseStatusInSupabase(id, 'approved');
+    const res = await updateExpenseStatusInSupabase(id, 'approved');
+    if (res.success) {
+      showToast('Comprobante aprobado y liquidado en Supabase.');
+    } else {
+      showToast(`Error aprobando en Supabase: ${res.error}`);
     }
-    showToast('Comprobante aprobado para liquidación contable.');
   };
 
   // Admin action: Reject / Observe expense
-  const handleRejectExpense = (id: string, notes: string) => {
+  const handleRejectExpense = async (id: string, notes: string) => {
     setExpenses(prev =>
       prev.map(e =>
         e.id === id
@@ -325,21 +328,25 @@ export default function App() {
           : e
       )
     );
-    if (isSupabaseConfigured()) {
-      updateExpenseStatusInSupabase(id, 'rejected', notes);
+    const res = await updateExpenseStatusInSupabase(id, 'rejected', notes);
+    if (res.success) {
+      showToast('Comprobante observado y registrado en Supabase.');
+    } else {
+      showToast(`Error registrando observación en Supabase: ${res.error}`);
     }
-    showToast('Comprobante observado. Se notificó la observación al colaborador.');
   };
 
   // Admin action: Settle relation
-  const handleSettleRelation = (relationId: string) => {
+  const handleSettleRelation = async (relationId: string) => {
     setRelations(prev =>
       prev.map(r => (r.id === relationId ? { ...r, status: 'settled' as const } : r))
     );
-    if (isSupabaseConfigured()) {
-      updateRelationStatusInSupabase(relationId, 'settled');
+    const res = await updateRelationStatusInSupabase(relationId, 'settled');
+    if (res.success) {
+      showToast('Relación cerrada y liquidada en Supabase.');
+    } else {
+      showToast(`Error cerrando relación en Supabase: ${res.error}`);
     }
-    showToast('Relación cerrada y liquidada conforme.');
   };
 
   // Active authenticated user profile
@@ -352,8 +359,28 @@ export default function App() {
     ? relations.filter(r => r.employeeName === currentEmployeeProfile?.name)
     : relations;
 
-  // Credentials info
+  // Supabase credentials info
   const creds = getSupabaseCredentials();
+
+  // LOADING SCREEN WHILE CONNECTING TO SUPABASE
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-2xl shadow-xl shadow-blue-600/30 mb-4 animate-pulse">
+          V
+        </div>
+        <h2 className="text-2xl font-black text-white tracking-tight">ViáticosPro</h2>
+        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          Cargando datos desde la Base de Datos Supabase (PostgreSQL)...
+        </p>
+        <div className="flex items-center gap-2 mt-4 text-xs font-mono text-emerald-400 bg-emerald-950/70 border border-emerald-800/70 px-3.5 py-1.5 rounded-full shadow-sm">
+          <Cloud className="w-4 h-4 text-emerald-400 animate-pulse" />
+          <span>{creds.projectRef}.supabase.co</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+        </div>
+      </div>
+    );
+  }
 
   // IF NOT AUTHENTICATED -> SHOW LOGIN SCREEN
   if (!session) {
@@ -363,21 +390,24 @@ export default function App() {
         adminToken={adminToken || DEFAULT_ADMIN_TOKEN}
         onLoginEmployee={handleLoginEmployee}
         onLoginAdmin={handleLoginAdmin}
+        onSeedDatabase={handleSeedSupabaseData}
+        isSeeding={isSeeding}
+        projectRef={creds.projectRef}
       />
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans pb-16">
-      {/* Top Bar with Brand, Identity Badge, Data Source Toggle, and Logout */}
+      {/* Top Bar with Brand, Identity Badge, Supabase Live Status, and Logout */}
       <TopBar
         portalMode={session.role}
         currentEmployee={currentEmployeeProfile}
         onLogout={handleLogout}
-        dataSourceMode={dataSourceMode}
-        onToggleDataSourceMode={handleToggleDataSourceMode}
         isSupabaseReady={isSupabaseConfigured()}
         projectRef={creds.projectRef}
+        onRefreshData={() => loadDataFromSupabase(false)}
+        isRefreshing={isRefreshing}
       />
 
       {/* Security & Access Strip */}
@@ -389,7 +419,7 @@ export default function App() {
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span className="font-bold text-emerald-950">Panel de Administración y Finanzas:</span>
                 <span className="text-slate-600 hidden sm:inline">
-                  Acceso confidencial. Crea asignaciones en Bolívares, emite tokens de colaboradores y audita liquidaciones.
+                  Acceso confidencial. Crea asignaciones en Bolívares (VES), emite tokens de colaboradores y audita liquidaciones.
                 </span>
               </>
             ) : (
@@ -403,14 +433,71 @@ export default function App() {
             )}
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-          >
-            Cambiar de Usuario
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => loadDataFromSupabase(false)}
+              disabled={isRefreshing}
+              className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 transition-colors flex items-center gap-1 cursor-pointer"
+              title="Refrescar datos desde Supabase"
+            >
+              <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Actualizando...' : 'Sincronizar Supabase'}</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="text-[11px] font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              Cambiar de Usuario
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* DB Connection Alert if error */}
+      {dbError && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{dbError}</span>
+            </div>
+            <button
+              onClick={() => loadDataFromSupabase(false)}
+              className="px-3 py-1 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg font-bold text-xs shrink-0 cursor-pointer"
+            >
+              Reintentar Conexión
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty Database Prominent Notice */}
+      {!isLoading && !dbError && employees.length === 0 && relations.length === 0 && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
+                <Cloud className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-sm block">Base de Datos Supabase Lista y Vacía</span>
+                <span className="text-slate-600">
+                  Las tablas en PostgreSQL no contienen registros aún. Puedes inicializarlas con datos de prueba o crear registros nuevos.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={handleSeedSupabaseData}
+              disabled={isSeeding}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
+              <span>{isSeeding ? 'Inicializando...' : 'Inicializar Datos Base en Supabase'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Container */}
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-8 flex-1">
@@ -420,7 +507,6 @@ export default function App() {
             currentEmployee={currentEmployeeProfile}
             relations={relations}
             expenses={expenses}
-            dataSourceMode={dataSourceMode}
             onOpenNewExpense={relationId => {
               setTargetRelationIdForExpense(relationId);
               setIsExpenseModalOpen(true);
@@ -435,10 +521,8 @@ export default function App() {
             expenses={expenses}
             employees={employees}
             adminToken={adminToken}
-            dataSourceMode={dataSourceMode}
-            onToggleDataSourceMode={handleToggleDataSourceMode}
-            onMigrateLocalToSupabase={handleMigrateLocalToSupabase}
-            onLoadFromSupabase={handleLoadFromSupabase}
+            onLoadFromSupabase={() => loadDataFromSupabase(false)}
+            onSeedInitialData={handleSeedSupabaseData}
             onOpenCreateRelation={() => setIsCreateRelationModalOpen(true)}
             onApproveExpense={handleApproveExpense}
             onRejectExpense={handleRejectExpense}
@@ -449,7 +533,8 @@ export default function App() {
             onUpdateEmployeeToken={handleUpdateEmployeeToken}
             onDeleteEmployee={handleDeleteEmployee}
             onUpdateAdminToken={handleUpdateAdminToken}
-            onSyncSupabase={handleLoadFromSupabase}
+            onSyncSupabase={() => loadDataFromSupabase(false)}
+            onClearAllData={handleClearAllData}
           />
         )}
       </main>

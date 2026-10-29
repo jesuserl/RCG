@@ -153,12 +153,9 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                         {activeRelation.startDate} al {activeRelation.endDate}
                       </span>
                       <span aria-hidden="true">·</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        dataSourceMode === 'supabase'
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-slate-700 text-slate-300'
-                      }`}>
-                        {dataSourceMode === 'supabase' ? '☁️ Supabase Cloud' : '💾 Modo Local'}
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Supabase PostgreSQL
                       </span>
                     </div>
 

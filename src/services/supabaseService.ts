@@ -229,6 +229,66 @@ export async function syncLocalDataToSupabase(
 }
 
 // -------------------------------------------------------------
+// Sembrado inicial de datos en Supabase (PostgreSQL)
+// -------------------------------------------------------------
+
+import { INITIAL_EMPLOYEES, INITIAL_RELATIONS, INITIAL_EXPENSES } from '../utils/storage';
+
+export async function seedInitialDataToSupabase(): Promise<{
+  success: boolean;
+  employeesSaved: number;
+  relationsSaved: number;
+  expensesSaved: number;
+  error?: string;
+}> {
+  return syncLocalDataToSupabase(INITIAL_EMPLOYEES, INITIAL_RELATIONS, INITIAL_EXPENSES);
+}
+
+// -------------------------------------------------------------
+// Vaciado / Limpieza Total de Tablas en Supabase (PostgreSQL)
+// -------------------------------------------------------------
+
+export async function clearAllSupabaseData(): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  if (!supabase || !isSupabaseConfigured()) {
+    return { success: false, error: 'Supabase no está configurado.' };
+  }
+
+  try {
+    // 1. Eliminar todos los gastos
+    const { error: expError } = await supabase
+      .from('expenses')
+      .delete()
+      .neq('id', '___non_existent___');
+    if (expError) throw new Error(`Gastos: ${expError.message}`);
+
+    // 2. Eliminar todas las relaciones de viaje
+    const { error: relError } = await supabase
+      .from('trip_relations')
+      .delete()
+      .neq('id', '___non_existent___');
+    if (relError) throw new Error(`Relaciones: ${relError.message}`);
+
+    // 3. Eliminar todos los colaboradores
+    const { error: empError } = await supabase
+      .from('employees')
+      .delete()
+      .neq('id', '___non_existent___');
+    if (empError) throw new Error(`Colaboradores: ${empError.message}`);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error vaciando tablas de Supabase:', err);
+    return {
+      success: false,
+      error: err.message || 'Error desconocido al vaciar tablas de Supabase',
+    };
+  }
+}
+
+// -------------------------------------------------------------
 // Funciones de consulta y persistencia de Empleados en Supabase
 // -------------------------------------------------------------
 
@@ -253,36 +313,36 @@ export async function fetchEmployeesFromSupabase(): Promise<EmployeeProfile[] | 
   }
 }
 
-export async function upsertEmployeeInSupabase(employee: EmployeeProfile): Promise<boolean> {
-  if (!supabase || !isSupabaseConfigured()) return false;
+export async function upsertEmployeeInSupabase(employee: EmployeeProfile): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
 
   try {
     const payload = mapEmployeeToDb(employee);
     const { error } = await supabase.from('employees').upsert(payload, { onConflict: 'id' });
     if (error) {
       console.error('Error guardando colaborador en Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Excepción guardando colaborador en Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error de conexión' };
   }
 }
 
-export async function deleteEmployeeFromSupabase(employeeId: string): Promise<boolean> {
-  if (!supabase || !isSupabaseConfigured()) return false;
+export async function deleteEmployeeFromSupabase(employeeId: string): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
 
   try {
     const { error } = await supabase.from('employees').delete().eq('id', employeeId);
     if (error) {
       console.error('Error eliminando colaborador en Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Excepción eliminando colaborador en Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error de conexión' };
   }
 }
 
@@ -311,25 +371,25 @@ export async function fetchRelationsFromSupabase(): Promise<TripRelation[] | nul
   }
 }
 
-export async function insertRelationInSupabase(relation: TripRelation): Promise<boolean> {
-  if (!supabase || !isSupabaseConfigured()) return false;
+export async function insertRelationInSupabase(relation: TripRelation): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
 
   try {
     const payload = mapRelationToDb(relation);
     const { error } = await supabase.from('trip_relations').upsert(payload, { onConflict: 'id' });
     if (error) {
       console.error('Error insertando relación en Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Excepción guardando relación en Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error de conexión' };
   }
 }
 
-export async function updateRelationStatusInSupabase(relationId: string, status: string): Promise<boolean> {
-  if (!supabase || !isSupabaseConfigured()) return false;
+export async function updateRelationStatusInSupabase(relationId: string, status: string): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
 
   try {
     const { error } = await supabase
@@ -339,12 +399,12 @@ export async function updateRelationStatusInSupabase(relationId: string, status:
 
     if (error) {
       console.error('Error actualizando estado de relación en Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Excepción actualizando relación en Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error de conexión' };
   }
 }
 
@@ -373,20 +433,20 @@ export async function fetchExpensesFromSupabase(): Promise<Expense[] | null> {
   }
 }
 
-export async function insertExpenseInSupabase(expense: Expense): Promise<boolean> {
-  if (!supabase || !isSupabaseConfigured()) return false;
+export async function insertExpenseInSupabase(expense: Expense): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
 
   try {
     const payload = mapExpenseToDb(expense);
     const { error } = await supabase.from('expenses').upsert(payload, { onConflict: 'id' });
     if (error) {
       console.error('Error insertando gasto en Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Excepción guardando gasto en Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error de conexión' };
   }
 }
 
@@ -394,8 +454,8 @@ export async function updateExpenseStatusInSupabase(
   expenseId: string,
   status: 'approved' | 'rejected',
   financeNotes?: string
-): Promise<boolean> {
-  if (!supabase || !isSupabaseConfigured()) return false;
+): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
 
   try {
     const { error } = await supabase
@@ -408,11 +468,11 @@ export async function updateExpenseStatusInSupabase(
 
     if (error) {
       console.error('Error actualizando estado de gasto en Supabase:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Excepción actualizando gasto en Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error de conexión' };
   }
 }
