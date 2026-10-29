@@ -60,6 +60,18 @@ export type PortalMode = 'login' | 'employee' | 'admin';
 
 export type UserRole = 'employee' | 'finance';
 
-export type TripProject = TripRelation;
+export type DataSourceMode = 'supabase' | 'local';
+
+export interface SupabaseDiagnostics {
+  connected: boolean;
+  url: string;
+  projectId: string;
+  employeesCount: number;
+  relationsCount: number;
+  expensesCount: number;
+  error?: string;
+  checkedAt: number;
+}
 
 export const DEFAULT_ADMIN_TOKEN = 'ADMIN-2026';
+

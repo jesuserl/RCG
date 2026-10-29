@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TripRelation, Expense, EmployeeProfile } from '../types';
+import { TripRelation, Expense, EmployeeProfile, DataSourceMode } from '../types';
 import { CATEGORIES_CONFIG } from '../utils/categories';
 import { 
   Plus, 
@@ -14,13 +14,16 @@ import {
   FolderCheck, 
   MessageSquare,
   User,
-  Coins
+  Coins,
+  Cloud,
+  HardDrive
 } from 'lucide-react';
 
 interface EmployeePortalProps {
   currentEmployee: EmployeeProfile;
   relations: TripRelation[];
   expenses: Expense[];
+  dataSourceMode?: DataSourceMode;
   onOpenNewExpense: (relationId: string) => void;
   onViewReceipt: (expense: Expense) => void;
   onSubmitRelation: (relationId: string) => void;
@@ -30,6 +33,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   currentEmployee,
   relations,
   expenses,
+  dataSourceMode = 'supabase',
   onOpenNewExpense,
   onViewReceipt,
   onSubmitRelation,
@@ -147,6 +151,14 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-blue-400" />
                         {activeRelation.startDate} al {activeRelation.endDate}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        dataSourceMode === 'supabase'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-700 text-slate-300'
+                      }`}>
+                        {dataSourceMode === 'supabase' ? '☁️ Supabase Cloud' : '💾 Modo Local'}
                       </span>
                     </div>
 
