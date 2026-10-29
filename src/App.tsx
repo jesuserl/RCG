@@ -32,6 +32,7 @@ import {
   deleteEmployeeFromSupabase,
   updateExpenseStatusInSupabase, 
   updateRelationStatusInSupabase,
+  deleteRelationFromSupabase,
   seedInitialDataToSupabase,
   clearAllSupabaseData
 } from './services/supabaseService';
@@ -349,6 +350,22 @@ export default function App() {
     }
   };
 
+  // Admin action: Delete relation and cascade delete its expenses
+  const handleDeleteRelation = async (relationId: string) => {
+    // Optimistic UI updates
+    setRelations(prev => prev.filter(r => r.id !== relationId));
+    setExpenses(prev => prev.filter(e => e.relationId !== relationId));
+
+    const res = await deleteRelationFromSupabase(relationId);
+    if (res.success) {
+      showToast('Relación de viaje y comprobantes eliminados de Supabase.');
+    } else {
+      showToast(`Error eliminando relación en Supabase: ${res.error}`);
+      // Reload on failure to restore consistency
+      await loadDataFromSupabase(false);
+    }
+  };
+
   // Active authenticated user profile
   const currentEmployeeProfile = session?.role === 'employee'
     ? employees.find(e => e.id === session.employeeId || e.name === session.employeeName) || employees[0]
@@ -472,33 +489,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Empty Database Prominent Notice */}
-      {!isLoading && !dbError && employees.length === 0 && relations.length === 0 && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
-                <Cloud className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="font-bold text-sm block">Base de Datos Supabase Lista y Vacía</span>
-                <span className="text-slate-600">
-                  Las tablas en PostgreSQL no contienen registros aún. Puedes inicializarlas con datos de prueba o crear registros nuevos.
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleSeedSupabaseData}
-              disabled={isSeeding}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
-              <span>{isSeeding ? 'Inicializando...' : 'Inicializar Datos Base en Supabase'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Main Container */}
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-8 flex-1">
         {session.role === 'employee' && currentEmployeeProfile ? (
@@ -524,6 +514,7 @@ export default function App() {
             onLoadFromSupabase={() => loadDataFromSupabase(false)}
             onSeedInitialData={handleSeedSupabaseData}
             onOpenCreateRelation={() => setIsCreateRelationModalOpen(true)}
+            onDeleteRelation={handleDeleteRelation}
             onApproveExpense={handleApproveExpense}
             onRejectExpense={handleRejectExpense}
             onSettleRelation={handleSettleRelation}

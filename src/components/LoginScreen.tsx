@@ -10,7 +10,6 @@ import {
   Eye, 
   EyeOff,
   CheckCircle2,
-  Sparkles,
   ArrowRight,
   Cloud,
   Database,
@@ -102,17 +101,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     onLoginAdmin();
   };
 
-  const fillDemoEmployeeToken = () => {
-    if (selectedEmployee) {
-      setEmployeeTokenInput(selectedEmployee.token);
-      setEmployeeError(null);
-    }
-  };
-
-  const fillDemoAdminToken = () => {
-    setAdminTokenInput(adminToken || DEFAULT_ADMIN_TOKEN);
-    setAdminError(null);
-  };
 
   return (
     <div className="min-h-screen bg-linear-to-b from-slate-900 via-slate-900 to-slate-950 text-white flex flex-col justify-between p-4 sm:p-6 font-sans">
@@ -122,10 +110,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           V
         </div>
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-          ViáticosPro
+          Registro de Viáticos
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Sistema de Control y Rendición de Viáticos en Bolívares (Bs. VES)
+          Sistema de Control y Rendición de Viáticos (Bs. VES)
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-2 mt-3 font-mono-numbers">
@@ -241,28 +229,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Token de Acceso Personal:
-                </label>
-                {selectedEmployee && (
-                  <button
-                    type="button"
-                    onClick={fillDemoEmployeeToken}
-                    className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>Auto-rellenar demo ({selectedEmployee.token})</span>
-                  </button>
-                )}
-              </div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                Token de Acceso Personal:
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <KeyRound className="w-4 h-4" />
                 </div>
                 <input
                   type={showEmployeeToken ? 'text' : 'password'}
-                  placeholder="Ej. EMP-1024"
+                  placeholder="••••••••••••"
                   value={employeeTokenInput}
                   onChange={e => {
                     setEmployeeTokenInput(e.target.value);
@@ -318,26 +294,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Clave de Acceso Administrador:
-                </label>
-                <button
-                  type="button"
-                  onClick={fillDemoAdminToken}
-                  className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span>Auto-rellenar ({adminToken || DEFAULT_ADMIN_TOKEN})</span>
-                </button>
-              </div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                Clave de Acceso Administrador:
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
                   type={showAdminToken ? 'text' : 'password'}
-                  placeholder="Ej. admindc2026*"
+                  placeholder="••••••••••••"
                   value={adminTokenInput}
                   onChange={e => {
                     setAdminTokenInput(e.target.value);

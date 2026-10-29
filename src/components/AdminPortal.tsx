@@ -42,7 +42,8 @@ import {
   DownloadCloud,
   Layers,
   ArrowRight,
-  Coins
+  Coins,
+  AlertTriangle
 } from 'lucide-react';
 import { exportExpensesToCsv } from '../utils/exportCsv';
 import { 
@@ -66,6 +67,7 @@ interface AdminPortalProps {
   onSeedInitialData?: () => Promise<{ success: boolean; message: string }>;
   onLoadFromSupabase: () => Promise<void>;
   onOpenCreateRelation: () => void;
+  onDeleteRelation?: (relationId: string) => Promise<void> | void;
   onApproveExpense: (id: string) => void;
   onRejectExpense: (id: string, notes: string) => void;
   onSettleRelation: (relationId: string) => void;
@@ -90,6 +92,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onSeedInitialData,
   onLoadFromSupabase,
   onOpenCreateRelation,
+  onDeleteRelation,
   onApproveExpense,
   onRejectExpense,
   onSettleRelation,
@@ -107,6 +110,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState('');
+
+  // Relation deletion confirmation modal state
+  const [relationToDelete, setRelationToDelete] = useState<TripRelation | null>(null);
+  const [deleteConfirmationCode, setDeleteConfirmationCode] = useState('');
+  const [isDeletingRelation, setIsDeletingRelation] = useState(false);
+  const [relationDeleteError, setRelationDeleteError] = useState<string | null>(null);
+
+  const handleConfirmDeleteRelation = async () => {
+    if (!relationToDelete || !onDeleteRelation) return;
+    const trimmedInput = deleteConfirmationCode.trim();
+    if (trimmedInput !== relationToDelete.code && trimmedInput.toUpperCase() !== 'ELIMINAR') {
+      setRelationDeleteError(`Debes escribir ${relationToDelete.code} o la palabra ELIMINAR.`);
+      return;
+    }
+
+    setIsDeletingRelation(true);
+    setRelationDeleteError(null);
+    try {
+      await onDeleteRelation(relationToDelete.id);
+      setRelationToDelete(null);
+      setDeleteConfirmationCode('');
+    } catch (err: any) {
+      setRelationDeleteError(err.message || 'Error al eliminar la relación');
+    } finally {
+      setIsDeletingRelation(false);
+    }
+  };
 
   // Collaborator management state
   const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false);
@@ -725,6 +755,20 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                             Liquidar
                           </button>
                         )}
+
+                        {onDeleteRelation && (
+                          <button
+                            onClick={() => {
+                              setRelationToDelete(rel);
+                              setDeleteConfirmationCode('');
+                              setRelationDeleteError(null);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-xl transition-colors cursor-pointer"
+                            title="Eliminar relación de viáticos"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1105,6 +1149,32 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
       {/* TAB 5: BASE DE DATOS SUPABASE (POSTGRESQL & DIAGNÓSTICO EN VIVO) */}
       {activeTab === 'database' && (
         <div className="space-y-6">
+          {/* Notification inside tab: Empty database status */}
+          {employees.length === 0 && relations.length === 0 && (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <Cloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-sm block text-emerald-950">Base de Datos Supabase Lista y Vacía</span>
+                  <span className="text-emerald-800">
+                    Las tablas en PostgreSQL no contienen registros aún. Puedes inicializar los datos base o crear registros nuevos desde este panel.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleMigrate}
+                disabled={isMigrating}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isMigrating ? 'animate-spin' : ''}`} />
+                <span>{isMigrating ? 'Inicializando...' : 'Inicializar Datos Base en Supabase'}</span>
+              </button>
+            </div>
+          )}
+
           {/* Diagnostic & Real-Time Sync Inspector Box */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -1460,6 +1530,114 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
         onClose={() => setIsCreateEmployeeModalOpen(false)}
         onSave={onCreateEmployee}
       />
+
+      {/* Modal de Confirmación Segura para Eliminar Relación */}
+      {relationToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-rose-100 overflow-hidden animate-scale-up">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    ¿Eliminar Relación de Viáticos?
+                  </h3>
+                  <p className="text-xs text-rose-600 font-semibold">
+                    Acción irreversible con validación de seguridad
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Código de Relación:</span>
+                  <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {relationToDelete.code}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Destino / Título:</span>
+                  <span className="font-semibold text-slate-800 truncate max-w-[180px]">
+                    {relationToDelete.title}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Colaborador:</span>
+                  <span className="font-bold text-slate-800">
+                    {relationToDelete.employeeName}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Fondo Asignado:</span>
+                  <span className="font-mono font-bold text-slate-900">
+                    Bs. {relationToDelete.allocatedBudget.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                  <span className="text-rose-700 font-semibold">Comprobantes asociados:</span>
+                  <span className="font-mono font-bold text-rose-700">
+                    {expenses.filter(e => e.relationId === relationToDelete.id).length} facturas
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Para evitar borrar por error, escribe el código de la relación <code className="px-1.5 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 font-mono font-bold rounded">{relationToDelete.code}</code> o la palabra <code className="px-1.5 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 font-mono font-bold rounded">ELIMINAR</code> a continuación:
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmationCode}
+                  onChange={e => {
+                    setDeleteConfirmationCode(e.target.value);
+                    if (relationDeleteError) setRelationDeleteError(null);
+                  }}
+                  placeholder={`Escribe ${relationToDelete.code} o ELIMINAR`}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs font-mono tracking-wider focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all placeholder:text-slate-400 placeholder:font-sans"
+                  autoFocus
+                />
+              </div>
+
+              {relationDeleteError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{relationDeleteError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRelationToDelete(null);
+                    setDeleteConfirmationCode('');
+                    setRelationDeleteError(null);
+                  }}
+                  disabled={isDeletingRelation}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteRelation}
+                  disabled={
+                    (deleteConfirmationCode.trim() !== relationToDelete.code &&
+                      deleteConfirmationCode.trim().toUpperCase() !== 'ELIMINAR') ||
+                    isDeletingRelation
+                  }
+                  className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className={`w-3.5 h-3.5 ${isDeletingRelation ? 'animate-spin' : ''}`} />
+                  <span>{isDeletingRelation ? 'Eliminando...' : 'Eliminar Permanentemente'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

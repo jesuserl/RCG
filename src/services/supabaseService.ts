@@ -408,6 +408,39 @@ export async function updateRelationStatusInSupabase(relationId: string, status:
   }
 }
 
+export async function deleteRelationFromSupabase(relationId: string): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
+
+  try {
+    // 1. Eliminar gastos dependientes asociados a la relación
+    const { error: expError } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('relation_id', relationId);
+
+    if (expError) {
+      console.error('Error eliminando gastos de la relación en Supabase:', expError.message);
+      return { success: false, error: expError.message };
+    }
+
+    // 2. Eliminar la relación de viaje
+    const { error: relError } = await supabase
+      .from('trip_relations')
+      .delete()
+      .eq('id', relationId);
+
+    if (relError) {
+      console.error('Error eliminando relación en Supabase:', relError.message);
+      return { success: false, error: relError.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Excepción eliminando relación en Supabase:', err);
+    return { success: false, error: err.message || 'Error de conexión' };
+  }
+}
+
 // -------------------------------------------------------------
 // Funciones de consulta y persistencia de Gastos en Supabase
 // -------------------------------------------------------------
