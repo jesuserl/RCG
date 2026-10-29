@@ -16,7 +16,9 @@ import {
   User,
   Coins,
   Cloud,
-  HardDrive
+  HardDrive,
+  Camera,
+  Pencil
 } from 'lucide-react';
 
 interface EmployeePortalProps {
@@ -25,6 +27,7 @@ interface EmployeePortalProps {
   expenses: Expense[];
   dataSourceMode?: DataSourceMode;
   onOpenNewExpense: (relationId: string) => void;
+  onOpenEditExpense?: (expense: Expense) => void;
   onViewReceipt: (expense: Expense) => void;
   onSubmitRelation: (relationId: string) => void;
 }
@@ -35,6 +38,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   expenses,
   dataSourceMode = 'supabase',
   onOpenNewExpense,
+  onOpenEditExpense,
   onViewReceipt,
   onSubmitRelation,
 }) => {
@@ -365,12 +369,20 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                                 {expense.concept}
                               </p>
 
-                              <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                              <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
                                 <span>{expense.date}</span>
-                                {expense.receiptFileName && (
+                                {expense.receiptFileName ? (
                                   <>
                                     <span aria-hidden="true">·</span>
                                     <span className="truncate max-w-[150px]">{expense.receiptFileName}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span aria-hidden="true">·</span>
+                                    <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] border border-amber-200">
+                                      <Camera className="w-3 h-3 text-amber-600" />
+                                      Sin foto adjunta
+                                    </span>
                                   </>
                                 )}
                               </div>
@@ -387,21 +399,45 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
                             <div className="text-right">
                               <span className="text-sm font-bold text-slate-900 font-mono-numbers block">
                                 Bs. {expense.amount.toFixed(2)}
                               </span>
                             </div>
 
+                            {/* Botón para ver foto si ya está adjuntada */}
                             {expense.receiptUrl && (
                               <button
                                 onClick={() => onViewReceipt(expense)}
-                                className="p-2 text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200"
+                                className="p-2 text-slate-500 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-xl transition-colors border border-slate-200 cursor-pointer"
                                 title="Ver comprobante de factura"
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
+                            )}
+
+                            {/* Opciones abiertas para completar foto o editar detalle antes de que se apruebe */}
+                            {expense.status !== 'approved' && onOpenEditExpense && (
+                              !expense.receiptUrl ? (
+                                <button
+                                  onClick={() => onOpenEditExpense(expense)}
+                                  className="px-2.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                  title="Adjuntar foto de la factura o editar datos"
+                                >
+                                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                                  <span className="hidden sm:inline">Completar Foto</span>
+                                  <span className="sm:hidden">Foto</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => onOpenEditExpense(expense)}
+                                  className="p-2 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                                  title="Editar detalle del comprobante"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                              )
                             )}
                           </div>
                         </div>

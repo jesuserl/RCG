@@ -3,22 +3,23 @@ import {
   X, 
   Upload, 
   Camera, 
-  Coins, 
-  Sparkles, 
   Trash2, 
   Check, 
   Receipt,
   FileCheck,
-  FolderOpen
+  FolderOpen,
+  Pencil,
+  AlertTriangle
 } from 'lucide-react';
 import { Expense, ExpenseCategory, TripRelation } from '../types';
 import { CATEGORIES_CONFIG, ALL_CATEGORIES } from '../utils/categories';
-import { generateSampleReceiptSvg } from '../utils/sampleReceipts';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (expense: Omit<Expense, 'id' | 'createdAt'>) => void;
+  onUpdate?: (expense: Expense) => void;
+  expenseToEdit?: Expense | null;
   relations: TripRelation[];
   activeRelationId?: string;
   currentEmployeeName: string;
@@ -28,6 +29,8 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onUpdate,
+  expenseToEdit,
   relations,
   activeRelationId,
   currentEmployeeName,
@@ -44,12 +47,30 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (activeRelationId) {
-      setRelationId(activeRelationId);
-    } else if (relations.length > 0 && !relationId) {
-      setRelationId(relations[0].id);
+    if (expenseToEdit) {
+      setRelationId(expenseToEdit.relationId);
+      setDate(expenseToEdit.date);
+      setCategory(expenseToEdit.category);
+      setConcept(expenseToEdit.concept);
+      setAmountStr(expenseToEdit.amount.toString());
+      setReceiptUrl(expenseToEdit.receiptUrl);
+      setReceiptFileName(expenseToEdit.receiptFileName);
+      setError('');
+    } else {
+      if (activeRelationId) {
+        setRelationId(activeRelationId);
+      } else if (relations.length > 0) {
+        setRelationId(relations[0].id);
+      }
+      setDate(new Date().toISOString().split('T')[0]);
+      setCategory('Alimentación');
+      setConcept('');
+      setAmountStr('');
+      setReceiptUrl(undefined);
+      setReceiptFileName(undefined);
+      setError('');
     }
-  }, [activeRelationId, relations]);
+  }, [isOpen, expenseToEdit, activeRelationId, relations]);
 
   if (!isOpen) return null;
 
@@ -73,39 +94,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleGenerateSampleReceipt = () => {
-    const randomTicketNum = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
-    const storeMap: Record<ExpenseCategory, string> = {
-      Hospedaje: 'Hotel & Posada Ejecutiva',
-      Alimentación: 'Restaurante & Panadería Criolla',
-      Transporte: 'Transporte Terrestre Interurbano',
-      Combustible: 'Estación de Servicios y Combustible',
-      Otros: 'Papelería y Suministros Comerciales',
-    };
-
-    const store = storeMap[category] || 'Establecimiento Comercial';
-    const sampleConcept = concept.trim() || `Gasto de ${category.toLowerCase()} durante viaje`;
-    const sampleAmount = numericAmount > 0 ? numericAmount : 1850.00;
-
-    if (!amountStr) {
-      setAmountStr(sampleAmount.toString());
-    }
-
-    const generatedSvgData = generateSampleReceiptSvg(
-      store,
-      category,
-      sampleConcept,
-      sampleAmount,
-      'VES',
-      date,
-      randomTicketNum
-    );
-
-    setReceiptUrl(generatedSvgData);
-    setReceiptFileName(`factura_${category.toLowerCase()}_${date}.svg`);
-    setError('');
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!concept.trim()) {
@@ -123,18 +111,34 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       return;
     }
 
-    onSave({
-      relationId: selectedRel.id,
-      date,
-      category,
-      concept: concept.trim(),
-      amount: numericAmount,
-      employeeName: selectedRel.employeeName,
-      projectName: selectedRel.title,
-      receiptUrl,
-      receiptFileName,
-      status: 'pending',
-    });
+    if (expenseToEdit && onUpdate) {
+      onUpdate({
+        ...expenseToEdit,
+        relationId: selectedRel.id,
+        date,
+        category,
+        concept: concept.trim(),
+        amount: numericAmount,
+        employeeName: selectedRel.employeeName,
+        projectName: selectedRel.title,
+        receiptUrl,
+        receiptFileName,
+        status: 'pending',
+      });
+    } else {
+      onSave({
+        relationId: selectedRel.id,
+        date,
+        category,
+        concept: concept.trim(),
+        amount: numericAmount,
+        employeeName: selectedRel.employeeName,
+        projectName: selectedRel.title,
+        receiptUrl,
+        receiptFileName,
+        status: 'pending',
+      });
+    }
 
     onClose();
   };
@@ -145,12 +149,22 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Registrar Comprobante de Gasto (Bs.)</h3>
-            <p className="text-xs text-slate-500">Ingresa los datos de la factura en Bolívares y adjunta la foto</p>
+            <h3 className="text-base font-bold text-slate-900">
+              {expenseToEdit
+                ? (expenseToEdit.receiptUrl ? 'Editar Detalle del Comprobante (Bs.)' : 'Completar Foto / Editar Gasto (Bs.)')
+                : 'Registrar Comprobante de Gasto (Bs.)'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {expenseToEdit
+                ? (expenseToEdit.receiptUrl 
+                    ? 'Modifica los datos del gasto o cambia la foto de la factura' 
+                    : 'Adjunta la foto pendiente del comprobante o ajusta los detalles antes de su aprobación')
+                : 'Ingresa los datos del gasto. La foto puede adjuntarse ahora o completarse después.'}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -158,6 +172,18 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
+          {expenseToEdit && !expenseToEdit.receiptUrl && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+              <Camera className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Comprobante abierto sin foto adjunta</span>
+                <span className="text-amber-800 text-[11px] leading-relaxed">
+                  Este gasto fue registrado provisionalmente. Puedes adjuntar la foto de la factura ahora con tu cámara o archivo y guardar los cambios antes de que Finanzas lo apruebe.
+                </span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
               {error}
@@ -298,16 +324,9 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 <Receipt className="w-4 h-4 text-slate-500" />
                 <span>Foto de Factura o Ticket Fiscal (Bs.)</span>
               </label>
-              
-              <button
-                type="button"
-                onClick={handleGenerateSampleReceipt}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
-                title="Generar factura de prueba con código de barra"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                Generar Ticket Demo
-              </button>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {receiptUrl ? 'Comprobante cargado' : 'Opcional (se puede completar luego)'}
+              </span>
             </div>
 
             {receiptUrl ? (
@@ -333,7 +352,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-100"
+                    className="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 cursor-pointer"
                   >
                     Cambiar
                   </button>
@@ -343,7 +362,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                       setReceiptUrl(undefined);
                       setReceiptFileName(undefined);
                     }}
-                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
+                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
                     title="Eliminar comprobante"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -363,7 +382,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                   Toca para tomar foto de la factura con la cámara o subir archivo
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Formatos PNG, JPG o PDF hasta 8 MB
+                  Formatos PNG, JPG o PDF hasta 8 MB · Si no la tienes a mano, puedes guardar el gasto y completarla luego
                 </p>
               </div>
             )}
@@ -383,16 +402,16 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl transition-colors"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-2"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              Guardar Gasto (Bs.)
+              <span>{expenseToEdit ? 'Guardar Cambios' : 'Guardar Gasto (Bs.)'}</span>
             </button>
           </div>
         </form>

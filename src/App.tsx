@@ -33,6 +33,7 @@ import {
   updateExpenseStatusInSupabase, 
   updateRelationStatusInSupabase,
   deleteRelationFromSupabase,
+  updateExpenseInSupabase,
   seedInitialDataToSupabase,
   clearAllSupabaseData
 } from './services/supabaseService';
@@ -57,6 +58,7 @@ export default function App() {
 
   // Modals state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [targetRelationIdForExpense, setTargetRelationIdForExpense] = useState<string | undefined>(undefined);
   const [isCreateRelationModalOpen, setIsCreateRelationModalOpen] = useState(false);
   const [printRelation, setPrintRelation] = useState<TripRelation | null>(null);
@@ -290,6 +292,24 @@ export default function App() {
     }
   };
 
+  // Employee action: Update expense details or complete missing photo
+  const handleUpdateExpense = async (updatedExpense: Expense) => {
+    // Optimistic UI update
+    setExpenses(prev => prev.map(e => (e.id === updatedExpense.id ? updatedExpense : e)));
+
+    const res = await updateExpenseInSupabase(updatedExpense);
+    if (res.success) {
+      showToast(
+        updatedExpense.receiptUrl
+          ? '¡Foto y comprobante actualizados en Supabase!'
+          : '¡Detalle del comprobante actualizado en Supabase!'
+      );
+    } else {
+      showToast(`Error actualizando comprobante en Supabase: ${res.error}`);
+      await loadDataFromSupabase(false);
+    }
+  };
+
   // Employee action: Submit relation to finance
   const handleSubmitRelation = async (relationId: string) => {
     setRelations(prev =>
@@ -498,7 +518,13 @@ export default function App() {
             relations={relations}
             expenses={expenses}
             onOpenNewExpense={relationId => {
+              setEditingExpense(null);
               setTargetRelationIdForExpense(relationId);
+              setIsExpenseModalOpen(true);
+            }}
+            onOpenEditExpense={expense => {
+              setEditingExpense(expense);
+              setTargetRelationIdForExpense(expense.relationId);
               setIsExpenseModalOpen(true);
             }}
             onViewReceipt={expense => setViewingReceiptExpense(expense)}
@@ -543,9 +569,12 @@ export default function App() {
         isOpen={isExpenseModalOpen}
         onClose={() => {
           setIsExpenseModalOpen(false);
+          setEditingExpense(null);
           setTargetRelationIdForExpense(undefined);
         }}
         onSave={handleCreateExpense}
+        onUpdate={handleUpdateExpense}
+        expenseToEdit={editingExpense}
         relations={relationsForModal}
         activeRelationId={targetRelationIdForExpense}
         currentEmployeeName={currentEmployeeProfile?.name || ''}

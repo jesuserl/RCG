@@ -43,7 +43,8 @@ import {
   Layers,
   ArrowRight,
   Coins,
-  AlertTriangle
+  AlertTriangle,
+  Camera
 } from 'lucide-react';
 import { exportExpensesToCsv } from '../utils/exportCsv';
 import { 
@@ -834,8 +835,8 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                           </span>
                         </div>
 
-                        {/* View Receipt button */}
-                        {exp.receiptUrl && (
+                        {/* View Receipt button or missing photo indicator */}
+                        {exp.receiptUrl ? (
                           <button
                             onClick={() => onViewReceipt(exp)}
                             className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
@@ -843,6 +844,11 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                             <Eye className="w-3.5 h-3.5" />
                             <span>Ver Comprobante</span>
                           </button>
+                        ) : (
+                          <span className="px-2.5 py-1 text-xs font-semibold text-amber-700 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-1">
+                            <Camera className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Sin Foto</span>
+                          </span>
                         )}
 
                         {/* Status Chip */}

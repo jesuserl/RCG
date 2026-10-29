@@ -509,3 +509,24 @@ export async function updateExpenseStatusInSupabase(
     return { success: false, error: err.message || 'Error de conexión' };
   }
 }
+
+export async function updateExpenseInSupabase(expense: Expense): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured()) return { success: false, error: 'Supabase no configurado' };
+
+  try {
+    const payload = mapExpenseToDb(expense);
+    const { error } = await supabase
+      .from('expenses')
+      .update(payload)
+      .eq('id', expense.id);
+
+    if (error) {
+      console.error('Error actualizando comprobante de gasto en Supabase:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Excepción actualizando gasto en Supabase:', err);
+    return { success: false, error: err.message || 'Error de conexión' };
+  }
+}
