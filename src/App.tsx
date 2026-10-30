@@ -529,6 +529,7 @@ export default function App() {
             }}
             onViewReceipt={expense => setViewingReceiptExpense(expense)}
             onSubmitRelation={handleSubmitRelation}
+            onOpenPrintReport={rel => setPrintRelation(rel)}
           />
         ) : (
           /* PANEL INDEPENDIENTE DEL ADMINISTRADOR / FINANZAS */
@@ -596,6 +597,8 @@ export default function App() {
           amount={viewingReceiptExpense.amount}
           date={viewingReceiptExpense.date}
           fileName={viewingReceiptExpense.receiptFileName}
+          expense={viewingReceiptExpense}
+          relation={relations.find(r => r.id === viewingReceiptExpense.relationId)}
         />
       )}
 
@@ -605,6 +608,7 @@ export default function App() {
           onClose={() => setPrintRelation(null)}
           relation={printRelation}
           expenses={expenses}
+          onViewReceipt={exp => setViewingReceiptExpense(exp)}
         />
       )}
     </div>

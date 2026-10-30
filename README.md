@@ -105,8 +105,19 @@ El sistema cuenta con dos roles claramente delimitados:
 
 ---
 
-### 4. Auditoría, Planilla Imprimible y Reportes
+### 4. Auditoría, Reporte Limpio y Descarga de Comprobantes en PDF
 
+- **Reporte Específico y Limpio de Relación de Gastos:**
+  - Disponible tanto para el **Colaborador** como para el **Administrador** en cualquier estado de la relación (**Abierta**, **Rendida** o **Liquidada**).
+  - Presenta un diseño corporativo limpio y estructurado con código oficial, datos del colaborador, destino, fechas, estado y notas de finanzas.
+  - Tabla de desglose de gastos en Bolívares (`Bs. VES`) con fecha, categoría, concepto, estatus de auditoría y soporte fotográfico.
+  - Resumen financiero de tres columnas: *Fondo Asignado por Administración*, *Total Gastado y Comprobado* y *Saldo a Reembolsar al Empleado* o *Saldo a Devolver a la Empresa*.
+  - Galería visual de comprobantes digitales adjuntos con vistas previas.
+  - Bloque oficial de firmas para Colaborador, Analista de Finanzas y Gerencia.
+- **Descarga de Comprobantes en PDF (Individual y Consolidado):**
+  - **Descarga Uno a Uno (Individual):** Cada comprobante cuenta con su botón `PDF` en la tabla de gastos, en el visor de fotos y en el reporte. Genera un documento PDF estructurado de alta calidad que incluye el encabezado fiscal, concepto, categoría, monto en Bolívares, fecha, estado y la fotografía del comprobante digital incrustada.
+  - **Descarga de Todos los Comprobantes Juntos:** Botón `Descargar Todos los Comprobantes (PDF)` que compila en un único expediente PDF la portada con el balance general de la comisión seguido de una página completa para cada comprobante adjunto.
+  - **Descarga del Reporte Resumen en PDF:** Botón `Descargar Reporte (PDF)` para obtener la planilla formal contable en archivo PDF directo.
 - **Auditoría de Comprobantes:**
   - Filtro por relación de viaje o búsqueda en tiempo real por concepto y colaborador.
   - Visualización del comprobante digital y datos fiscales.
@@ -114,12 +125,6 @@ El sistema cuenta con dos roles claramente delimitados:
   - Botón de **Rechazar / Observar** con campo obligatorio de notas contables para justificar el rechazo al colaborador.
 - **Liquidación Final:**
   - Una vez revisados todos los comprobantes, el Administrador liquida la relación (`settled`), congelando el balance contable final.
-- **Planilla Oficial de Liquidación de Viáticos:**
-  - Formato listo para impresión física o guardado en PDF (Ctrl+P / Command+P).
-  - Encabezado institucional con código de liquidación, fecha, beneficiario y destino.
-  - Tabla de comprobantes discriminada por categoría, concepto, fecha y monto en Bolívares.
-  - Resumen financiero: *Fondo Asignado*, *Total Justificado*, *Saldo a Reintegrar a la Empresa* o *Saldo a Reembolsar al Empleado*.
-  - Cuadro de firmas: *Colaborador / Beneficiario*, *Revisado por Finanzas* y *Aprobado por Dirección*.
 - **Exportación CSV:** Descarga directa de la base de datos de viáticos compatible con Microsoft Excel y Google Sheets.
 
 ---

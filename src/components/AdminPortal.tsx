@@ -44,9 +44,13 @@ import {
   ArrowRight,
   Coins,
   AlertTriangle,
-  Camera
+  Camera,
+  FileDown,
+  Files,
+  FileText
 } from 'lucide-react';
 import { exportExpensesToCsv } from '../utils/exportCsv';
+import { downloadSingleExpensePdf } from '../utils/pdfGenerator';
 import { 
   supabase,
   isSupabaseConfigured, 
@@ -699,10 +703,11 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
 
                         <button
                           onClick={() => onOpenPrintReport(rel)}
-                          className="p-1.5 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
-                          title="Generar planilla oficial de liquidación"
+                          className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                          title="Ver reporte oficial de liquidación y comprobantes PDF"
                         >
-                          <Printer className="w-4 h-4" />
+                          <Printer className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Reporte</span>
                         </button>
 
                         {rel.status !== 'settled' && (
@@ -757,6 +762,22 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                   </option>
                 ))}
               </select>
+
+              {selectedRelationFilter !== 'all' && (() => {
+                const activeFilteredRel = relations.find(r => r.id === selectedRelationFilter);
+                if (!activeFilteredRel) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onOpenPrintReport(activeFilteredRel)}
+                    className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Ver reporte oficial completo de esta relación"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Ver Reporte de la Relación</span>
+                  </button>
+                );
+              })()}
             </div>
 
             <div className="relative w-full sm:w-64">
@@ -850,6 +871,20 @@ CREATE POLICY "Acceso publico gastos" ON public.expenses FOR ALL USING (true) WI
                             <span>Sin Foto</span>
                           </span>
                         )}
+
+                        {/* Descargar Comprobante Individual en PDF */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const rel = relations.find(r => r.id === exp.relationId);
+                            downloadSingleExpensePdf(exp, rel);
+                          }}
+                          className="px-2.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                          title="Descargar este comprobante en formato PDF"
+                        >
+                          <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                          <span>PDF</span>
+                        </button>
 
                         {/* Status Chip */}
                         <div>

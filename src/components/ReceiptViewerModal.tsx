@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { X, ZoomIn, ZoomOut, RotateCw, Download, FileText } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, RotateCw, Download, FileText, FileDown, Loader2 } from 'lucide-react';
+import { Expense, TripRelation } from '../types';
+import { downloadSingleExpensePdf } from '../utils/pdfGenerator';
 
 interface ReceiptViewerModalProps {
   isOpen: boolean;
@@ -10,6 +12,8 @@ interface ReceiptViewerModalProps {
   currency?: string;
   date: string;
   fileName?: string;
+  expense?: Expense;
+  relation?: TripRelation;
 }
 
 export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
@@ -21,9 +25,12 @@ export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
   currency = 'Bs.',
   date,
   fileName,
+  expense,
+  relation,
 }) => {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   if (!isOpen || !receiptUrl) return null;
 
@@ -31,13 +38,38 @@ export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
   const handleRotate = () => setRotation(prev => (prev + 90) % 360);
 
-  const handleDownload = () => {
+  const handleDownloadImage = () => {
     const link = document.createElement('a');
     link.href = receiptUrl;
     link.download = fileName || `comprobante_${date}.jpg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const expToUse: Expense = expense || {
+        id: 'exp-temp',
+        relationId: relation?.id || '',
+        employeeName: relation?.employeeName || 'Colaborador',
+        projectName: relation?.title || 'Relación de Gastos',
+        category: 'Otros',
+        concept,
+        amount,
+        date,
+        receiptUrl,
+        receiptFileName: fileName,
+        status: 'pending',
+        createdAt: Date.now(),
+      };
+      await downloadSingleExpensePdf(expToUse, relation);
+    } catch (err) {
+      console.error('Error generando PDF de comprobante:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
@@ -64,38 +96,51 @@ export const ReceiptViewerModal: React.FC<ReceiptViewerModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             <button
               onClick={handleZoomIn}
-              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
               title="Aumentar zoom"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
             <button
               onClick={handleZoomOut}
-              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
               title="Disminuir zoom"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
             <button
               onClick={handleRotate}
-              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
               title="Girar imagen"
             >
               <RotateCw className="w-4 h-4" />
             </button>
             <button
-              onClick={handleDownload}
-              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors"
-              title="Descargar comprobante"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="px-2.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+              title="Descargar comprobante en PDF formateado"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileDown className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">PDF</span>
+            </button>
+            <button
+              onClick={handleDownloadImage}
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+              title="Descargar imagen original"
             >
               <Download className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors ml-1"
+              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition-colors ml-1 cursor-pointer"
               title="Cerrar"
             >
               <X className="w-5 h-5" />
